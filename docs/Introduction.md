@@ -1,59 +1,159 @@
-## Raspberry Pi OS project introduction or how to efficiently learn operating system development?
+## Raspberry Pi OSプロジェクトの紹介、あるいは、オペレーティング・システムを効率よく学ぶ方法
 
-A few years ago, I opened the source code of the Linux kernel for the first time. At that time, I considered myself more or less a skillful software developer: I knew a little bit of assembler and C programming, and had a high-level understanding of major operating system concepts, such as process scheduling and virtual memory management. However, my first attempt was a complete failure - I understood almost nothing.
+数年前、私は初めてLinuxカーネルのソースコードを開きました。当時の私は
+自分がソフトウェア開発者として多少なりともスキルがあると思っていました。
+アセンブラやC言語を少しかじった程度でしたが、プロセススケジューリングや
+仮想メモリ管理などのOSの主要な概念についてはよく理解していました。しかし、
+私の最初の挑戦は完全に失敗でした。私は何も理解していなかったのです。
 
-For other software projects that I have to deal with, I have a simple approach that usually works very well: I find the entry point of the program and then start reading the source code, going as deep as necessary to understand all the details that I am interested in. This approach works well, but not for something as sophisticated as an operating system. It was not just that it took me more than a week just to find an entry point - the main problem was that I quickly found myself in a situation where I was looking at a few lines of code,  and I had no idea how to find any clues about what those lines were doing. This was especially true for the low-level assembler source code, but it worked no better for any other part of the system that I tried to investigate. 
+私がと解決しなければならないその他のソフトウェアプロジェクトでは、私は
+シンプルなアプローチをとっていますが、たいていはうまくいきます。それは、
+プログラムのエントリーポイントを見つけ、ソースコードを読み始め、興味を
+持った細部をすべて理解するために必要なだけ深く掘り下げていく方法です。
+この方法はうまくいくのですが、オペレーティングシステムのような高度な
+ものには使えません。それは単にエントリーポイントを見つけるだけで1週間
+以上もかかったというだけではなありません。一番の問題は、自分は数行の
+コードを見ているだけであり、その行が何をしているかの手がかりを見つける
+方法さえ見つけられないという状況にあることがすぐにわかったことでした。
+これは特に低レベルのアセンブラソースコードで顕著でしたが、調べようと
+したシステムの他の部分についても同じでした。
 
-I don't like the idea of dismissing a problem just because it looks complex from the beginning. Furthermore, I believe that there are no complex problems. Instead, there are a lot of problems we simply don't know how to address efficiently, so I started to look for an effective way to learn OS development in general and Linux in particular.
+私はそれが複雑そうだからといって初めから問題を避けてしますのは好きでは
+ありません。さらに、私は複雑な問題など存在しないと考えています。実際、
+効率的に問題を解決する方法を単に私が知らない問題はたくさん存在します。
+そこで私は、OSの開発全般、特にLinuxを効率的に学べる方法を探し始めました。
 
-### Challenges in learning OS development
+## OSの開発を学ぶ上での課題
 
-I know that there are tons of books and documentation written about Linux kernel development, but neither of them provides me with the learning experience that I want. Half of the material are so superficial that I already know it. With the other half I have a very similar problem that I have with exploring the kernel source code: as soon as a book goes deep enough, 90% of the details appear to be irrelevant to the core concepts, but related to some security, performance or legacy considerations as well as to millions of features that the Linux kernel supports. As a result, instead of learning core operating system concepts, you always end up digging into the implementation details of those features.
+Linuxカーネルの開発について書かれた本やドキュメントは山ほどありますが、
+私が望むような学習効果が得られるものはありませんでした。これらの半分は
+表面的なものですでに知っていることばかりです。残りの半分は、私がカーネル
+ソースコードを調べていた時に感じた問題とよく似た問題があります。本の内容が
+進むとすぐにその90%はセキュリティやパフォーマンス、レガシーに関する考察や
+Linuxカーネルがサポートする何百万もの機能といった中心的な概念とは無関係と
+思われるものに関係する内容です。その結果、オペレーティングシステムの中心と
+なる概念を学ぶ代わりに、それらの機能の実装詳細を掘り下げることになって
+しまうのです。
 
-You may be wondering why I need to learn operating system development in the first place. For me, the main reason is that I was always interested in how things work under the hood. It is not just curiosity: the more difficult the task you are working on, frequently things begin to trace down to the operating system level. You just can't make fully informed technical decisions if you don't understand how everything works at a lower level. Another thing is that if you really like a technical challenge, working with OS development can be an exciting task for you.
+そもそも、なぜオペレーティングシステムの開発を学ぶ必要があるのかと思われるかも
+しれません。私の場合は、背後で物事がどのように動いているのかに常に興味があったことが
+主な理由です。単なる好奇心ではありません。取り組む課題が難しければ難しいほど
+OSのレベルまでさかのぼって考えることが多くなるからです。下層レベルでの動作を
+理解していないと、十分な情報に基づいた技術的な決定を下すことはできません。また、
+技術的なチャレンジが好きな人にとっては、OS開発に取り組むことはエキサイティングな
+課題になるでしょう。
 
-The next question you may ask is, why Linux? Other operating systems would probably be easier to approach. The answer is that I want my knowledge to be, at least in some way, relevant to what I am currently doing and to something I expect to be doing in the future. Linux is perfect in this regard because nowadays everything from small IoT devices to large servers tend to run Linux.
+次の疑問はなぜLinuxなのかでしょう。他のOSの方がとっつきやすいのではないか。
+その答えは、自分の知識が、少なくとも何らかの形で、自分が現在行っている、あるいは
+将来行うであろうことに関連していることを望んでいるからです。この点でLinuxは完璧です。
+というのも、最近では小さなIoTデバイスから大規模なサーバーまであらゆるものが
+Linuxで動く傾向にあるからです。
 
-When I said that most of the books about Linux kernel development didn't work well for me - I wasn't being quite honest. There was one book that explained some essential concepts using the actual source code that I was capable of fully understanding even though I am a novice in OS development. This book is "Linux Device Drivers", and it's no wonder that it is one of the most famous technical books about the Linux kernel. It starts by introducing source code of a simple driver that you can compile and play around with. Then it begins to introduce new driver related concepts one by one and explains how to modify the source code of the driver to use these new concepts. That is exactly what I refer to as a "good learning experience". The only problem with this book is that it focuses explicitly on driver development and says very little about core kernel implementation details.
+Linuxのカーネル開発に関する書籍のほとんどが私には合わないと言いましたが、それは
+正確ではありませんでした。OS開発の初心者である私でも十分に理解できるように
+実際のソースコードを使って本質的な概念を説明している本が一冊だけありました。
+それは「Linuxデバイスドライバ」です。この本がLinuxカーネルに関する最も有名な
+技術書の一冊であることも頷けます。この本は、まず、コンパイルして遊べる簡単な
+ドライバのソースコードの紹介から始まります。そして、ドライバーに関する新しい
+概念を一つずつ紹介し、その新しい概念を使うためにドライバーのソースコードを
+どのように修正するかを説明しています。これこそが、私の言う「良い学習体験」
+なのです。この本の唯一の問題点は、ドライバの開発に明確に焦点を当てており、
+コアカーネルの実装の詳細についてはほとんど書かれていないことです。
 
-But why has nobody created a similar book for kernel developers? I think this is because if you use the current Linux kernel source code as a base for your book, then it's just not possible. There is no function, structure, or module that can be used as a simple starting point because there is nothing simple about the Linux source. You also can't introduce new concepts one at a time because in the source code, everything is very closely related to one another. After I realized this, an idea came to me: if the Linux kernel is too vast and too complicated to be used as a starting point for learning OS development, why don't I implement my own OS that will be explicitly designed for learning purposes? In this way, I can make the OS simple enough to provide a good learning experience. Also, if this OS will be implemented mostly by copying and simplifying different parts of the Linux kernel source, it would be straightforward to use it as a starting point to learn the Linux kernel as well. In addition to the OS, I decided to write a series of lectures that teaches major OS development concepts and fully explains the OS source code.
+では、なぜ誰もカーネル開発者向けに同じような本を作らなかったのでしょうか。
+それは、本のベースとして現在のLinuxカーネルのソースコードを使おうとすると、
+どうしても無理があるからだと思います。簡単な出発点として使えるような関数や
+構造体、モジュールがLinuxには存在しましせん。Linuxのソースにはシンプルな
+ものはないからです。また、新しい概念を一つずつ導入することもできません。
+ソースコードの中ではすべてが互いに密接に関連しているからです。これに気づくと
+私に一つのアイデアが浮かびました。それは、LinuxのカーネルがOS開発を学ぶための
+出発点としてあまりにも膨大かつ複雑すぎるのであれば、学習用として明確に設計
+された独自のOSを実装すればいいのではないかというものです。そうすれば、OSを
+シンプルにして、より良い学習体験を与えることができます。また、このOSの実装の
+ほとんどをLinuxカーネルソースのコピーとその単純化で行えば、Linuxカーネルを
+学ぶための出発点としてもそのまま使えます。OSだけでなく、OS開発の主要な概念を
+教え、OSのソースコードを完全に説明する一連のレクチャも書くことにしました。
 
-### OS requirements
+## OSの要件
 
-I started working on the project, which later became the [RPi OS](https://github.com/s-matyukevich/raspberry-pi-os). The first thing I had to do was to determine what parts of kernel development I considered to be "basic", and what components I considered to be not so essential and can be skipped (at least in the beginning). In my understanding, each operating system has 2 fundamental goals:
+私は後に[RPi OS](https://github.com/s-matyukevich/raspberry-pi-os)となる
+プロジェクトに着手しました。まず最初にしなければならなかったのは、カーネル開発の
+どの部分が「基本」であり、どの部分がそれほど重要ではなく、（少なくとも最初の
+うちは）省略してもよいかを決めることでした。私の理解では各オペレーティング
+システムには2つの基本的な目標があります。
 
-1. Run user processes in isolation.
-1. Provide each user process with a unified view of the machine hardware.
+1. ユーザープロセスを隔離して実行する。
+2. 各ユーザープロセスにハードウェアの統一されたビューを提供すること。
 
-To satisfy the first requirement, the RPi OS needs to have its own scheduler. If I want to implement a scheduler, I also have to handle timer interrupts. The second requirement implies that the OS should support some drivers and provide system calls to expose them to user applications. Since this is for beginners, I don't want to work with complicated hardware, so the only drivers I care about are drivers that can write something to screen and read user input from a keyboard. Also, the OS needs to be able to load and execute user programs, so naturally it needs to support some sort of file system and be capable of understanding some sort of executable file format. It would be nice if the OS can support basic networking, but I don't want to focus on that in a text for beginners. So those are basically the things that I can identify as "core concepts of any operating system".
+1つ目の要件を満たすために、RPi OSは独自のスケジューラを持つ必要があります。
+スケジューラを実装するなら、タイマー割り込みも処理しなければなりません。
+2つ目の要件は、OSが何らかのドライバをサポートし、それらをユーザアプリケーションに
+公開するシステムコールを提供しなければならないことを意味します。このOSは初心者
+向けなので、複雑なハードウェアは扱いたくありません。そこで、私が関心を持つドライバは
+画面に何かを書き込み、キーボードからユーザの入力を読み込むことができるドライバ
+だけです。また、OSはユーザプログラムを読み込んで実行できる必要があるので、当然、
+何らかのファイルシステムをサポートし、何らかの実行ファイル形式を理解できる必要が
+あります。OSが基本的なネットワークをサポートしていればいいのですが、初心者向けの
+テキストではそのようなことは重視したくありません。以上が私が基本的に「あらゆるOSの
+中心的概念」として認識できるものです。
 
-Now let's take a look at the things that I want to ignore:
-1. **Performance** I don't want to use any sophisticated algorithms in the OS. I am also going to disable all caches and other performance optimization techniques for simplicity.
-1. **Security** It is true that the RPi OS has at least one security feature: virtual memory. Everything else can be safely ignored.
-1. **Multiprocessing and synchronization** I am quite happy with my OS being executed on a single processor core. In particular, this allows me to get rid of a vast source of complexity - synchronization. 
-1. **Support for multiple architectures and different types of devices** More on this in the next section.
-1. **Millions of other features that any production-ready operating system supports**
+では、無視したいものを見てみましょう。
 
-### How Raspberry Pi comes into play
+1. **パフォーマンス** 高度なアルゴリズムをOSには使いたくありません。また、シンプルにするために、キャッシュなどのパフォーマンス最適化技術はすべて無効にするつもりです。
+2. **セキュリティ** RPi OSには少なくとも仮想メモリというセキュリティ機能があるのは事実です。それ以外はすべて安全に無視することができます。
+3. **マルチプロセッシングと同期** 私は自分のOSがシングルプロセッサコアで実行されることに満足しています。特に、同期という膨大な複雑さの原因を取り除くことができるからです。
+4. **複数のアーキテクチャと様々なデバイスのサポート** これについては次節で説明します。
+5. **製品版のOSがサポートするその他無数の機能**
 
-I already mentioned that I don't want the RPi OS to support multiple computer architectures or a lot of different devices. I felt even stronger about this after I dug into the Linux kernel driver model. It appears that even devices with similar purposes can largely vary in implementation details. This makes it very difficult to come up with simple abstractions around different driver types, and to reuse driver source code. To me, this seems like one of the primary sources of complexity in the Linux kernel, and I definitely want to avoid it in the RPi OS. Ok, but what kind of computer should I use then? I clearly don't want to test my bare metal programs using my working laptop, because I'm honestly not sure that it is going to survive. More importantly, I don't want people to buy an expensive laptop just to follow my OS development exercises (I don't think anybody would do this anyway). Emulators look like more or less a good choice, but I want to work with a real device because it gives me the feeling that I am doing something real rather than playing with bare metal programming.
+## どうしてラズベリーパイなのか
 
-I ended up using the Raspberry Pi, in particular, the [Raspberry Pi 3 Model B](https://www.raspberrypi.org/products/raspberry-pi-3-model-b/). Using this device looks like the ideal choice for a number of reasons:
+RPi OSが複数のコンピュータアーキテクチャや数多くの様々なデバイスをサポートする
+ことを私が望んでいないことはすでに述べました。Linuxカーネルのドライバモデルを
+調べてみて、その思いはさらに強くなりました。同じような目的を持ったデバイスでも
+その実装内容は大きく異なるようです。そのため、ドライバの種類に応じたシンプルな
+抽象化やドライバのソースコードの再利用は非常に難しくなります。私にはこれが
+Linuxカーネルを複雑にしている原因のひとつだと思えるので、RPi OSでは絶対に避けたいと
+思っています。では、どんなコンピュータを使うべきなのか。ベアメタルプログラムの
+テストのために現座使っているラップトップを使いたくないのは明らかです。さらに
+重要なことは、私のOS開発の課題を行うために高価なノートパソコンを買ってもらいたくは
+ありません（どうせ誰もやらないだろうけど）。エミュレータを使うのもいいかも
+しれませんが、私は本物のデバイスを使いたいと思っています。そのほうが、ベアメタル
+プログラミングで遊んでいるというよりも、何か現実的なことをやっているという感じが
+するからです。
 
-1. It costs something around $35. I think that should be an affordable price.
-1. This device is specially designed for learning. Its inner architecture is as simple as possible, and that perfectly suits my needs.
-1. This device uses ARM v8 architecture. This is a simple RISC architecture, is very well adapted to OS authors' needs, and doesn't have so many legacy requirements as, for example, the popular x86 architecture. If you don't believe me, you can compare the amount of source code in the `/arch/arm64` and `/arch/x86` folders in the Linux kernel.
+私は結局、Raspberry Pi、特に、[Raspberry Pi 3 Model B](https://www.raspberrypi.org/products/raspberry-pi-3-model-b/)を使うことにしました。このデバイスを使うことは
+多くの理由により理想的な選択だと思われます。
 
-The OS is not compatible with the older versions of the Raspberry Pi, because neither of them support 64 bit ARM v8 architecture, though I think that support for all future devices should be trivial.
+1. 価格が35ドル前後。これは手ごろな価格だと思います。
+2. 学習用に特別に設計されている。内部のアーキテクチャが可能な限りシンプルであり、
+   私のニーズにぴったり合っています。
+3. ARM v8アーキテクチャを採用している。このデバイスは。シンプルなRISCアーキテクチャで
+   あり、OS製作者のニーズによく対応しており、たとえば人気の高いx86アーキテクチャの
+   ように多くのレガシー要件がありません。私を信じられない方は、Linuxカーネルの
+   `/arch/arm64`フォルダと`/arch/x86`フォルダにあるソースコードの量を比較してみて
+   ください。
 
-### Working with community
+このOSはRaspberry Piの旧バージョンでは使用できません。なぜなら、それらは64ビット
+ARM v8アーキテクチャをサポートしていないからです。今度出るであろうすべてのデバイスの
+サポートは簡単だと思います。
 
-One major drawback of any technical book is that very soon after release each book becomes obsolete. Technology nowadays is evolving so fast that it is almost impossible for book writers to keep up with it. That's why I like the idea of an "open source book" - a book that is freely available on the internet and encourages its readers to participate in content creation and validation. If the book content is available on Github, it is very easy for any reader to fix and develop new code samples, update the book content, and participate in writing new chapters. I understand that right now the project is not perfect, and at the time of writing it is even not finished. But I still want to publish it now, because I hope that with the help of the community I will be able to not only complete the project faster but also to make it much better and much more useful than it was in the beginning. 
+## コミュニティとの連携
 
-##### Previous Page
+技術書の大きな欠点は、発売後すぐに陳腐化してしまうことです。最近の技術は非常に速く
+進化しているので、本を書く人がそれに追いつくのはほとんど不可能です。だからこそ、
+私は、インターネット上で自由に利用でき、読者がコンテンツの作成や検証に参加できる
+本である「オープンソースブック」というアイデアが好きなのです。本の内容がGithubで
+公開されていれば、読者は誰でも簡単に新しいコードサンプルを修正・開発したり、本の
+内容を更新したり、新しい章の執筆に参加することができます。このプロジェクトが現時点では
+完璧ではないことは理解していますし、この記事を書いている時点ではまだ完成していません。
+それでも私は今この本を出版したいと思っています。コミュニティの助けを借りれば、
+このプロジェクトをより早く完成させることができるだけでなく、当初よりもはるかに
+優れた、より便利なものにすることができると期待するからです。
 
-[Main Page](https://github.com/s-matyukevich/raspberry-pi-os#learning-operating-system-development-using-linux-kernel-and-raspberry-pi)
+##### 前ページ
 
-##### Next Page
+[Main Page](../README.md)
+
+##### 次ページ
 
 [Contributing to the Raspberry PI OS](../docs/Contributions.md)
