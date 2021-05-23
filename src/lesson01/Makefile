@@ -1,7 +1,7 @@
-ARMGNU ?= aarch64-linux-gnu
+ARMGNU ?= aarch64-none-elf
 
 COPS = -Wall -nostdlib -nostartfiles -ffreestanding -Iinclude -mgeneral-regs-only
-ASMOPS = -Iinclude 
+ASMOPS = -Iinclude
 
 BUILD_DIR = build
 SRC_DIR = src
@@ -9,7 +9,7 @@ SRC_DIR = src
 all : kernel8.img
 
 clean :
-	rm -rf $(BUILD_DIR) *.img 
+	rm -rf $(BUILD_DIR) *.img
 
 $(BUILD_DIR)/%_c.o: $(SRC_DIR)/%.c
 	mkdir -p $(@D)
@@ -29,3 +29,6 @@ DEP_FILES = $(OBJ_FILES:%.o=%.d)
 kernel8.img: $(SRC_DIR)/linker.ld $(OBJ_FILES)
 	$(ARMGNU)-ld -T $(SRC_DIR)/linker.ld -o $(BUILD_DIR)/kernel8.elf  $(OBJ_FILES)
 	$(ARMGNU)-objcopy $(BUILD_DIR)/kernel8.elf -O binary kernel8.img
+
+run: kernel8.img
+	qemu-system-aarch64 -m 1024 -M raspi3 -serial null -serial stdio -kernel kernel8.img
