@@ -16,9 +16,4 @@
 #define AUX_MU_STAT_REG (PBASE+0x00215064)
 #define AUX_MU_BAUD_REG (PBASE+0x00215068)
 
-/* for Exercise 1.5.1 */
-#define SYSTEM_CLOCK 250 * 1000 * 1000
-#define baud_rate 230400
-#define baud_reg ((SYSTEM_CLOCK / (8 * baud_rate)) - 1)
-
 #endif  /*_P_MINI_UART_H */

@@ -2,7 +2,7 @@
 #include "peripherals/mini_uart.h"
 #include "peripherals/gpio.h"
 
-void mini_uart_send ( char c )
+void uart_send ( char c )
 {
 	while(1) {
 		if(get32(AUX_MU_LSR_REG)&0x20)
@@ -11,7 +11,7 @@ void mini_uart_send ( char c )
 	put32(AUX_MU_IO_REG,c);
 }
 
-char mini_uart_recv ( void )
+char uart_recv ( void )
 {
 	while(1) {
 		if(get32(AUX_MU_LSR_REG)&0x01)
@@ -20,14 +20,14 @@ char mini_uart_recv ( void )
 	return(get32(AUX_MU_IO_REG)&0xFF);
 }
 
-void mini_uart_send_string(char* str)
+void uart_send_string(char* str)
 {
 	for (int i = 0; str[i] != '\0'; i ++) {
-		mini_uart_send((char)str[i]);
+		uart_send((char)str[i]);
 	}
 }
 
-void mini_uart_init ( void )
+void uart_init ( void )
 {
 	unsigned int selector;
 
@@ -49,7 +49,7 @@ void mini_uart_init ( void )
 	put32(AUX_MU_IER_REG,0);                //Disable receive and transmit interrupts
 	put32(AUX_MU_LCR_REG,3);                //Enable 8 bit mode
 	put32(AUX_MU_MCR_REG,0);                //Set RTS line to be always high
-	put32(AUX_MU_BAUD_REG,baud_reg);             //Set baud rate to 115200
+	put32(AUX_MU_BAUD_REG,270);             //Set baud rate to 115200
 
 	put32(AUX_MU_CNTL_REG,3);               //Finally, enable transmitter and receiver
 }
