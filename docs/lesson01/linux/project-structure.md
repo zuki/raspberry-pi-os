@@ -1,34 +1,60 @@
-## 1.2: Linux project structure
+## 1.2: Linuxプロジェクトの構成
 
-This is the first time we are going to talk about Linux. The idea is first to complete some small step in writing our own kernel, and then take a look at how the same things work in Linux. So far we have done very little: we just implemented our first bare metal hello world program, Still, we will be able to find some similarities between the RPi OS and Linux. And now we are going to explore some of them.
+今回は初めてLinuxについてお話します。まず、自分たちのカーネルを書くという
+小さなステップを完了させ、その後、同じことがLinuxでどのように機能するかを
+見てみようというものです。今のところ、私たちはほとんど何もしていません。
+最初のベアメタルのhello worldプログラムを実装しただけです。それでも
+RPi OSとLinuxにはいくつかの類似点があることがわかります。これからその
+いくつかを探っていきます。
 
-### Project structure
+### プロジェクトの構成
 
-Whenever you start investigating any large software project, it worth taking a quick look at the project structure. This is very important because it allows you to understand what modules compose the project and what is the high-level architecture. Let's try to explore project structure of the Linux kernel.
+大規模なソフトウェアプロジェクトの調査を始める際にいつもで、プロジェクトの
+構造をざっと見てみる価値があります。これは非常に重要です。どんなモジュールで
+プロジェクトを構成されているのか、ハイレベルなアーキテクチャはどのように
+なっているかを理解することができるからです。それでは、Linuxカーネルの
+プロジェクトの構成を調べてみましょう。
 
-First of all, you need to clone the Linux repository.
+まず最初に、Linux リポジトリをクローンします。
 
 ```
 git clone -b v4.14 --depth 1 https://github.com/torvalds/linux.git
 ```
 
-We are using `v4.14` version because this was the latest version at the time of writing. All references to the Linux source code will be made using this specific version.
+ここでは`v4.14`を使用します。執筆時点での最新バージョンであったからです。
+Linuxのソースコードを参照する場合はすべてこのバージョンを使用します。
 
-Next, let's take a look at the folders that we can find inside the Linux repository. We are not going to look at all of them, but only at those that I consider the most important to start with.
+次に、Linux のリポジトリにあるフォルダを見てみましょう。ここでは
+すべてのフォルダを見るのではなく、最も重要と思われるフォルダだけを
+見ていきます。
 
-* [arch](https://github.com/torvalds/linux/tree/v4.14/arch) This folder contains subfolders, each for a specific processor architecture. Mostly we are going to work with [arm64](https://github.com/torvalds/linux/tree/v4.14/arch/arm64) - this is the one that is compatible with ARM.v8 processors.
-* [init](https://github.com/torvalds/linux/tree/v4.14/init) Kernel is always booted by architecture specific code. But then execution is passed to the [start_kernel](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L509) function that is responsible for common kernel initialization and is an architecture independent kernel starting point. `start_kernel` function, together with some other initialization functions, is defined in the `init` folder.
-* [kernel](https://github.com/torvalds/linux/tree/v4.14/kernel) This is the core of the Linux kernel. Almost all major kernel subsystems are implemented there.
-* [mm](https://github.com/torvalds/linux/tree/v4.14/mm) All data structures and methods related to memory management are defined there.
-* [drivers](https://github.com/torvalds/linux/tree/v4.14/drivers) This is the largest folder in the Linux kernel. It contains implementations of all device drivers.
-* [fs](https://github.com/torvalds/linux/tree/v4.14/fs) You can look here to find different filesystem implementations.
+* [arch](https://github.com/torvalds/linux/tree/v4.14/arch) このフォルダ
+  にはサブフォルダがあり、それぞれが特定のプロセッサアーキテクチャ用に
+  なっています。ここで見るのはほとんどが[arm64](https://github.com/torvalds/linux/tree/v4.14/arch/arm64)です。これはARM.v8プロセッサと互換性があるものです。
+* [init](https://github.com/torvalds/linux/tree/v4.14/init) カーネルは
+  常にアーキテクチャ固有のコードにより起動されます。次に実行は[start_kernel](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L509)
+  関数に渡されます。この関数は一般的なカーネルの初期化を担当し、アーキテクチャ
+  に依存しないカーネルの開始地点です。`start_kernel`関数は他の初期化関数と
+  ともに`init`フォルダで定義されています。
+* [kernel](https://github.com/torvalds/linux/tree/v4.14/kernel) Linuxカーネルの
+  中核となるものです。ほとんどすべての主要なカーネルサブシステムはここで
+  実装されています。
+* [mm](https://github.com/torvalds/linux/tree/v4.14/mm) メモリ管理に関連
+  するすべてのデータ構造とメソッドが定義されています。
+* [drivers](https://github.com/torvalds/linux/tree/v4.14/drivers) Linux
+  カーネルの中で最大のフォルダです。すべてのデバイスドライバの実装が
+  含まれています。
+* [fs](https://github.com/torvalds/linux/tree/v4.14/fs) さまざまな
+  ファイルシステムの実装をここで見ることができます。
 
-This explanation is very high-level, but this is enough for now. In the next chapter, we will try to examine Linux build system in some details.
+以上の説明は非常にハイレベルなものですが今はこれで十分です。次の章では
+Linuxのビルドシステムについて詳しく見ていきます。
 
-##### Previous Page
 
-1.1 [Kernel Initialization: Introducing RPi OS, or bare metal "Hello, world!"](../../../docs/lesson01/rpi-os.md)
+##### 前ページ
 
-##### Next Page
+1.1 [カーネル初期化: RPi OSの導入、ベアメタルで"Hello, World!"](../../../docs/lesson01/rpi-os.md)
 
-1.3 [Kernel Initialization: Kernel build system](../../../docs/lesson01/linux/build-system.md)
+##### 次ページ
+
+1.3 [カーネル初期化: カーネルビルドシステム](../../../docs/lesson01/linux/build-system.md)
