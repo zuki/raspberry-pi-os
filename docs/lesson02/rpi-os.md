@@ -1,30 +1,69 @@
-## 2.1: Processor initialization 
+## 2.1: プロセッサの初期化
 
-In this lesson, we are going to work more closely with the ARM processor. It has some essential features that can be utilized by the OS. The first such feature is called "Exception levels".
+このレッスンでは、ARMプロセッサーをより詳しく見ていきます。ARMにはこのOSが
+利用できるいくつかの重要な機能があります。そのような最初の機能は「例外レベル」と
+呼ばれているものです。
 
-### Exception levels
+### 例外レベル
 
-Each ARM processor that supports ARM.v8 architecture has 4 exception levels. You can think about an exception level (or `EL` for short) as a processor execution mode in which only a subset of all operations and registers is available. The least privileged exception level is level 0. When processor operates at this level, it mostly uses only general purpose registers (X0 - X30) and stack pointer register (SP). EL0 also allows using `STR` and `LDR` commands to load and store data to and from memory and a few other instructions commonly used by a user program.
+ARM.v8アーキテクチャに対応したARMプロセッサには4つの例外レベルがあります。
+例外レベル（略して`EL`）とは、すべての演算やレジスタのサブセットのみが
+利用できるプロセッサの実行モードだと考えることができます。最も特権の少ない
+例外レベルはレベル0です。このレベルでプロセッサが動作する場合、プロセッサは
+ほとんど汎用レジスタ（X0～X30）とスタックポインタレジスタ（SP）しか使用しません。
+EL0では、`STR`コマンドと`LDR`コマンドを使用して、メモリとの間でデータのロードと
+ストアを行うことができます。また、ユーザープログラムでよく使われるいくつかの
+目入れも使用することができます。
 
-An operating system should deal with exception levels because it needs to implement process isolation. A user process should not be able to access other process's data. To achieve such behavior, an operating system always runs each user process at EL0. Operating at this exception level a process can only use it's own virtual memory and can't access any instructions that change virtual memory settings. So, to ensure process isolation, an OS need to prepare separate virtual memory mapping for each process and put the processor into EL0 before transferring execution to a user process.
+オペレーティングシステムはプロセスの隔離を実現する必要があるので例外レベルを
+扱う必要があります。ユーザプロセスが他のプロセスのデータにアクセスできては
+いけません。このような動作を実現するためにOSはユーザプロセスを常にEL0で動作
+させます。この例外レベルで動作する場合、プロセスは自身の仮想メモリしか使用
+できず、仮想メモリの設定を変更する命令にもアクセスできません。このように
+プロセスの隔離を確保するために、OSはプロセスごとに個別の仮想メモリのマッピングを
+用意し、プロセッサをEL0にしてからユーザプロセスに実行を移す必要があります。
 
-An operating system itself usually works at EL1. While running at this exception level processor gets access to the registers that allows configuring virtual memory settings as well as to some system registers. Raspberry Pi OS also will be using EL1.
+オペレーティングシステム自身は通常EL1で動作します。この例外レベルで動作する
+場合、プロセッサは仮想メモリの設定を可能にするレジスタやいくつかのシステム
+レジスタにアクセスすることができます。Raspberry PiのOSもEL1で動作します。
 
-We are not going to use exceptions levels 2 and 3 a lot, but I just want to briefly describe them so you can get an idea why they are needed. 
+このOSでは例外レベル2と3はあまり使用しませんが、なぜ必要なのかを理解して
+もらうために簡単に説明します。
 
-EL2 is used in a scenario when we are using a hypervisor. In this case host operating system runs at EL2 and guest operating systems can only use EL 1. This allows host OS to isolate guest OSes in a similar way how OS isolates user processes.
+EL2はハイパーバイザーを使用する時に使用します。この場合、ホストOSはEL2で動作し、
+ゲストOSはEL1しか使用できません。これによりOSがユーザプロセスを隔離するのと
+同様に、ホストOSがゲストOSを隔離することができます。
 
-EL3 is used for transitions from ARM "Secure World" to "Insecure world". This abstraction exist to provide full hardware isolation between the software running in two different "worlds". Application from an "Insecure world" can in no way access or modify information (both instruction and data) that belongs to "Secure world", and this restriction is enforced at the hardware level. 
+EL3はARMの「安全な世界」から「安全ではない世界」への移行に使用されます。
+この抽象化は、2つの異なる「世界」で動作するソフトウェア間にすべてハードウェアに
+よる隔離を提供するために存在します。「安全ではない世界」のアプリケーションからは
+「安全な世界」に属する情報（命令とデータの両方）にアクセスしたり変更したり
+することはできません。そして、この制約はハードウェアレベルで実施されます。
 
-### Debugging the kernel
+### カーネルをデバッグする
 
-Next thing that I want to do is to figure out which Exception level we are currently using. But when I tried to do this, I realized that the kernel could only print some constant string on a screen, but what I need is some analog of [printf](https://en.wikipedia.org/wiki/Printf_format_string) function. With `printf` I can easily display values of different registers and variables. Such functionality is essential for the kernel development because you don't have any other debugger support and `printf` becomes the only mean by which you can figure out what is going on inside your program.
+次にやりたいことは、現在使用している例外レベルを解明することです。しかし、
+これを実行しようとしたとき、カーネルはある一定の文字列を画面に表示すること
+しかできないことに気づきました。私に必要なものは [printf](https://en.wikipedia.org/wiki/Printf_format_string)
+関数に相当するものです。`printf`があればさまざまなレジスタや変数の値を簡単に
+表示することができます。このような機能はカーネルの開発には欠かせません。
+なぜなら、デバッガは使えないので`printf`がプログラムの内部で何が起こっている
+かを把握するための唯一の手段になるからです。
 
-For the RPi OS I decided not to reinvent the wheel and use one of  [existing printf implementations](http://www.sparetimelabs.com/tinyprintf/tinyprintf.php) This function consists mostly from string manipulations and is not very interesting from a kernel developer point of view. The implementation that I used is very small and don't have external dependencies, that allows it to be easily integrated into the kernel. The only thing that I have to do is to define `putc`  function that can send a single character to the screen. This function is defined [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/mini_uart.c#L59) and it just uses already existing `uart_send` function. Also, we need to initialize the `printf` library and specify the location of the `putc` function. This is done in a single [line of code](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/kernel.c#L8).
+RPi OSのために車輪の再発明はせず、 [既存のpritfの実装](http://www.sparetimelabs.com/tinyprintf/tinyprintf.php)を
+使うことにしました。この機能はほとんどが文字列の操作で構成されており、カーネル
+開発者の観点からはあまり面白いものではありません。私が使った実装は非常に小さく、
+外部依存性がないので、カーネルに簡単に組み込むことができます。私がしなければ
+ならないことは、スクリーンに一文字を送信することができる`putc`関数を定義する
+ことだけです。この関数は[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/mini_uart.c#L59)で定義されており、既存の`uart_send`
+関数を利用しているだけです。また、`printf`ライブラリを初期化し、`putc`関数の
+場所を指定する必要もあります。これは[一行のコード](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/kernel.c#L8)でできます。
 
-### Finding current Exception level
+### カレント例外レベルを知る
 
-Now, when we are equipped with the `printf` function, we can complete our original task: figure out at which exception level the OS is booted. A small function that can answer this question is defined [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/utils.S#L1) and looks like this.
+さて、`printf`関数が使えるようになったので、本来の目的である「OSがどの例外
+レベルで起動されたのか」を解明できるようになりました。この質問に答えることが
+できる小さな関数が[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/utils.S#L1) で定義されています。次のようなものです。
 
 ```
 .globl get_el
@@ -34,36 +73,64 @@ get_el:
     ret
 ```
 
-Here we use `mrs` instruction to read the value from `CurrentEL` system register into `x0` register. Then we shift this value 2 bits to the right (we need to do this because first 2 bits in the `CurrentEL` register are reserved and always have value 0) And finally in the register `x0` we have an integer number indicating current exception level. Now the only thing that is left is to display this value, like [this](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/kernel.c#L10).
+ここでは`mrs`命令を使用して`CurrentEL`システムレジスタの値を`x0`レジスタに
+読み込んでいます。そして、この値を2ビット右にシフトします（`CurrentEL`
+レジスタの最初の2ビットは予約されており、常に値が0であるため、これを行う
+必要があります）。最終的に、レジスタ`x0`には現在の例外レベルを示す整数値が
+残ります。あとはこの値を[このように](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/kernel.c#L10)表示するだけです。
 
 ```
     int el = get_el();
     printf("Exception level: %d \r\n", el);
 ```
 
-If you reproduce this experiment, you should see `Exception level: 3` on the screen.
+これを再現したら、画面に`Exception level: 3`と表示されるはずです。
 
-### Changing current exception level
+### カレント例外レベルを変更する
 
-In ARM architecture there is no way how a program can increase its own exception level without the participation of the software that already runs on a higher level. This makes a perfect sense: otherwise, any program would be able to escape its assigned EL and access other programs data. Current EL can be changed only if an exception is generated. This can happen if a program executes some illegal instruction (for example, tries to access memory location at a nonexisting address, or tries to divide by 0) Also an application can run `svc` instruction to generate an exception on purpose. Hardware generated interrupts are also handled as a special type of exceptions. Whenever an exception is generated the following sequence of steps takes place (In the description I am assuming that the exception is handled at EL `n`, were `n` could be 1, 2 or 3).
+ARMアーキテクチャでは、すでに高いレベルで動作しているソフトウェアの
+関与がなければ、プログラムが自身の例外レベルを上げることはできません。
+これは完全に合理的です。そうでないと、すべてのプログラムは割り当てられた
+ELから抜け出すことができ、他のプログラムのデータにアクセスできてしまう
+からです。現在のELを変更できるのは、例外が発生した場合のみです。例外は
+プログラムが何らかの不正な命令を実行した場合に起こります（たとえば、
+存在しないアドレスのメモリ位置にアクセスしたり、0で割ろうとした場合です）。
+また、アプリケーションは例外を発生させるのを目的として`svc`命令を実行
+することができます。ハードウェアが生成する割込みも特殊な種類の例外として
+扱われます。例外が発生すると、次のような手順で処理されます（ここでは、
+EL `n`で例外が処理されると仮定します。`n`は1、2、3のいずれかです）。
 
-1. Address of the current instruction is saved in the `ELR_ELn`  register. (It is called `Exception link register`)
-1. Current processor state is stored in `SPSR_ELn` register (`Saved Program Status Register`)
-1. An exception handler is executed and does whatever job it needs to do.
-1. Exception handler calls `eret` instruction. This instruction restores processor state from `SPSR_ELn` and resumes execution starting from the address, stored in the `ELR_ELn`  register.
+1. 現在の命令のアドレスが`ELR_ELn`レジスタに保存されます（このレジスタは
+   `例外リンクレジスタ`と呼ばれています）。
+2. 現在のプロセッサの状態が`SPSR_ELn`レジスタ（`プログラム状態保存レジスタ
+   : Saved Program Status Register`）に保存されます。
+3. 例外ハンドラが実行され、必要な処理を行います。
+4. 例外ハンドラは`eret`命令を呼び出します。この命令は、プロセッサの状態を
+   `SPSR_ELn`から復元し、`ELR_ELn`レジスタに格納されているアドレスから
+   実行を再開します。
 
-In practice the process is a little more complicated because exception handler also needs to store the state of all general purpose registers and restore it back afterwards, but we will discuss this process in details in the next lesson. For now, we need just to understand the process in general and remember the meaning of the `ELR_ELn` and `SPSR_ELn` registers.
+実際には、例外ハンドラはすべての汎用レジスタの状態も保存し、その後復元する
+必要があるため、プロセスはもう少し複雑になります。このプロセスについては
+次回のレッスンで詳しく説明します。現時点では、一般的なプロセスを理解し、
+`ELR_ELn`と`SPSR_ELn`レジスタの意味を覚えておけばよいでしょう。
 
-An important thing to know is that exception handler is not obliged to return to the same location from which the exception originates. Both `ELR_ELn` and `SPSR_ELn` are writable and exception handler can modify them if it wants to. We are going to use this technique to our advantage when we try to switch from EL3 to EL1 in our code.
+ここで重要なことは、例外ハンドラは例外が発生した場所に戻る義務はないと
+いうことです。`ELR_ELn`と`SPSR_ELn`はどちらも書き込み可能であり、例外
+ハンドラは必要に応じてそれらを変更することができます。このテクニックを
+利用してEL3からEL1への切り替えを行いましょう。
 
-### Switching to EL1
+### EL1へ切り替える
 
-Strictly speaking, our operating system is not obliged to switch to EL1, but EL1 is a natural choice for us because this level has just the right set of privileges to implement all common OS tasks. It also will be an interesting exercise to see how switching exceptions levels works in action. Let's take a look at the [source code that does this](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/boot.S#L17).
+厳密に言えば私たちのOSはEL1に切り替える義務はありません。しかし、この
+レベルにはOSに共通するすべてのタスクを実装するのに適した権限があるので
+EL1は私たちにとって自然な選択です。また、例外レベルの切り替えが実際に
+どのように行われるかを確認することは、興味深い実習となるでしょう。では、
+[これを行うソースコード](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/boot.S#L17)を見てみましょう。
 
 ```
 master:
     ldr    x0, =SCTLR_VALUE_MMU_DISABLED
-    msr    sctlr_el1, x0        
+    msr    sctlr_el1, x0
 
     ldr    x0, =HCR_VALUE
     msr    hcr_el2, x0
@@ -74,90 +141,122 @@ master:
     ldr    x0, =SPSR_VALUE
     msr    spsr_el3, x0
 
-    adr    x0, el1_entry        
+    adr    x0, el1_entry
     msr    elr_el3, x0
 
-    eret                
+    eret
 ```
 
-As you can see the code consists mostly of configuring a few system registers. Now we are going to examine those registers one by one. In order to do this we first need to download [AArch64-Reference-Manual](https://developer.arm.com/docs/ddi0487/ca/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile). This document contains the detailed specification of the `ARM.v8` architecture. 
+ご覧のように、このコードのほとんどはいくつかのシステムレジスタの設定から
+なっています。これらのレジスタを一つずつ調べていきましょう。そのためには
+まず、[AArch64レファレンスマニュアル](https://developer.arm.com/docs/ddi0487/ca/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile)を
+ダウンロードする必要があります。このドキュメントには`ARM.v8`アーキテクチャの
+詳細な仕様が記載されています。
 
-#### SCTLR_EL1, System Control Register (EL1), Page 2654 of AArch64-Reference-Manual.
+#### SCTLR_EL1, システム制御レジスタ (EL1), AArch64レファレンスマニュアルの2654ページ
 
 ```
     ldr    x0, =SCTLR_VALUE_MMU_DISABLED
-    msr    sctlr_el1, x0        
+    msr    sctlr_el1, x0
 ```
 
-Here we set the value of the `sctlr_el1` system register. `sctlr_el1` is responsible for configuring different parameters of the processor, when it operates at EL1. For example, it controls whether the cache is enabled and, what is most important for us, whether the MMU (Memory Management Unit) is turned on. `sctlr_el1` is accessible from all exception levels higher or equal than EL1 (you can infer this from `_el1` postfix) 
+ここでは、`sctlr_el1`システムレジスタの値を設定しています。 `sctlr_el1`は
+EL1で動作する際のプロセッサのさまざまなパラメータを設定する役割を果たします。
+たとえば、キャッシュを有効にするか否かや、私たちにとって最も重要なMMU(メモリ
+管理ユニット）を作動させるか否かなどを制御します。`sctlr_el1`は、EL1以上の
+すべての例外レベルからアクセスできます（`_el1`という後置詞xから推測できます）。
 
-`SCTLR_VALUE_MMU_DISABLED` constant is defined [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L16) Individual bits of this value are defined like this:
+`SCTLR_VALUE_MMU_DISABLED`定数は、[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L16)で
+定義されています。この値の各ビットは次のように定義されています。
 
-* `#define SCTLR_RESERVED                  (3 << 28) | (3 << 22) | (1 << 20) | (1 << 11)` Some bits in the description of `sctlr_el1` register are marked as `RES1`. Those bits are reserved for future usage and should be initialized with `1`.
-* `#define SCTLR_EE_LITTLE_ENDIAN          (0 << 25)` Exception [Endianness](https://en.wikipedia.org/wiki/Endianness). This field controls endianess of explicit data access at EL1. We are going to configure the processor to work only with `little-endian` format.
-* `#define SCTLR_EOE_LITTLE_ENDIAN         (0 << 24)` Similar to previous field but this one controls endianess of explicit data access at EL0, instead of EL1. 
-* `#define SCTLR_I_CACHE_DISABLED          (0 << 12)` Disable instruction cache. We are going to disable all caches for simplicity. You can find more information about data and instruction caches [here](https://stackoverflow.com/questions/22394750/what-is-meant-by-data-cache-and-instruction-cache).
-* `#define SCTLR_D_CACHE_DISABLED          (0 << 2)` Disable data cache.
-* `#define SCTLR_MMU_DISABLED              (0 << 0)` Disable MMU. MMU must be disabled until the lesson 6, where we are going to prepare page tables and start working with virtual memory.
+* `#define SCTLR_RESERVED                  (3 << 28) | (3 << 22) | (1 << 20) | (1 << 11)` `sctlr_el1`レジスタの説明の中でいくつかのビットは`RES1`とマークされています。これらのビットは将来の使用のために予約されており，`1`で初期化する必要があります。
+* `#define SCTLR_EE_LITTLE_ENDIAN          (0 << 25)` 例外の[エンディアン](https://en.wikipedia.org/wiki/Endianness)。このフィールドは、EL1での明示的なデータアクセスのエンディアンを制御します。ここでは`リトルエンディアン`形式でのみ動作するようにプロセッサを設定します。
+* `#define SCTLR_EOE_LITTLE_ENDIAN         (0 << 24)` 前のフィールドと似ていますが、このフィールドはEL1ではなくEL0での明示的なデータアクセスのエンディアンを制御します。
+* `#define SCTLR_I_CACHE_DISABLED          (0 << 12)` 命令キャッシュを無効にします。ここでは簡単にするためにすべてのキャッシュを無効にします。データキャッシュと命令キャッシュについての詳細は[こちら](https://stackoverflow.com/questions/22394750/what-is-meant-by-data-cache-and-instruction-cache)をご覧ください。
+* `#define SCTLR_D_CACHE_DISABLED          (0 << 2)` データキャッシュを無効にします。
+* `#define SCTLR_MMU_DISABLED              (0 << 0)` MMUを無効にします。MMUはレッスン6までは無効にする必要があります。そこではページテーブルを用意して、仮想メモリで動作するようにします。
 
-#### HCR_EL2, Hypervisor Configuration Register (EL2), Page 2487 of AArch64-Reference-Manual. 
+#### HCR_EL2, ハイパーバイザ制御レジスタ (EL2), AArch64レファレンスマニュアルの2487ページ
 
 ```
     ldr    x0, =HCR_VALUE
     msr    hcr_el2, x0
 ```
 
-We are not going to implement our own [hypervisor](https://en.wikipedia.org/wiki/Hypervisor). Stil we need to use this register because, among other settings, it controls the execution state at EL1. Execution state must be `AArch64` and not `AArch32`. This is configured [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L22).
+私たちは独自の [ハイパーバイザ](https://en.wikipedia.org/wiki/Hypervisor)を
+実装する予定はありません。しかし、このレジスタを使用する必要があります。
+中でも、このレジスタはEL1での実行状態を制御するからです。実行状態は
+`AArch32`ではなく、`AArch64`でなければなりません。これは[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L22)で設定しています。
 
-#### SCR_EL3, Secure Configuration Register (EL3), Page 2648 of AArch64-Reference-Manual.
+#### SCR_EL3, セキュア構成レジスタ (EL3), AArch64レファレンスマニュアルの2648ページ
 
 ```
     ldr    x0, =SCR_VALUE
     msr    scr_el3, x0
 ```
 
-This register is responsible for configuring security settings. For example, it controls whether all lower levels are executed in "secure" or "nonsecure" state. It also controls execution state at EL2. [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L26) we set that EL2  will execute at `AArch64` state, and all lower exception levels will be "non secure". 
+このレジスタは、セキュリティ設定を構成する役割を果たします。たとえば、
+すべての下位レベルを「セキュア」または「ノンセキュア」のどちらの状態で
+実行するかを制御します。また、EL2での実行状態も制御します。ここでは、
+EL2では`AArch64`状態で実行し、下位の例外レベルはすべて「ノンセキュア」に
+なるように[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L26)で設定しています。
 
-#### SPSR_EL3, Saved Program Status Register (EL3), Page 389 of AArch64-Reference-Manual.
+#### SPSR_EL3, プログラム状態保存レジスタ (EL3), AArch64レファレンスマニュアルの389ページ
 
 ```
     ldr    x0, =SPSR_VALUE
     msr    spsr_el3, x0
 ```
 
-This register should be already familiar to you - we mentioned it when discussed the process of changing exception levels. `spsr_el3` contains processor state, that will be restored after we execute `eret` instruction.
-It is worth saying a few words explaining what processor state is. Processor state includes the following information:
+このレジスタは皆さんにはすでにおなじみでしょう。例外レベルを変更する
+プロセスについて説明した際に触れているからです。`spsr_el3`には
+`eret`命令を実行すると復元されるプロセッサの状態が格納されます。
+プロセッサの状態とは何かについて、少し説明しておきましょう。
+プロセッサの状態には以下の情報が含まれます。
 
-* **Condition Flags** Those flags contains information about previously executed operation: whether the result was negative (N flag), zero (A flag), has unsigned overflow (C flag) or has signed overflow (V flag). Values of those flags can be used in conditional branch instructions. For example, `b.eq` instruction will jump to the provided label only if the result of the last comparison operation is equal to 0. The processor checks this by testing whether Z flag is set to 1.
+* **条件フラグ** これらのフラグには直前に実行された操作に関する情報が
+含まれています。すなわち、結果は負（Nフラグ）、ゼロ（Aフラグ）、符号
+なしのオーバーフロー（Cフラグ）、符号付きのオーバーフロー（Vフラグ）の
+いずれであったかという情報です。これらのフラグの値は条件付き分岐命令で
+使用することができます。たとえば，`b.eq`命令は，直前の比較演算の結果が
+0に等しい場合にのみ，指定されたラベルにジャンプします。プロセッサは
+Zフラグが1にセットされているかをテストすることでこれをチェックします。
 
-* **Interrupt disable bits** Those bits allows to enable/disable different types of interrupts.
+* **割り込み禁止ビット** これらのビットは、さまざまな種類の割り込みを
+有効/無効にすることができます。
 
-* Some other information, required to fully restore the processor execution state after an exception is handled.
+* その他の情報は、例外処理の後にプロセッサの実行状態を完全に復元する
+ために必要です。
 
-Usually `spsr_el3` is saved automatically when an exception is taken to EL3. However this register is writable, so we take advantage of this fact and manually prepare processor state. `SPSR_VALUE` is prepared [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L35) and we initialize the following fields:
+通常、`spsr_el3`はEL3で例外が発生したときに自動的に保存されます。しかし、
+このレジスタは書き込み可能であるため、この事実を利用して手動でプロセッサの
+状態を準備します。[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L35)では`SPSR_VALUE`を用意し、
+以下のフィールドを初期化しています。
 
-* `#define SPSR_MASK_ALL        (7 << 6)` After we change EL to EL1 all types of interrupts will be masked (or disabled, which is the same).
-* `#define SPSR_EL1h        (5 << 0)` At EL1 we can either use our own dedicated stack pointer or use EL0 stack pointer. `EL1h` mode means that we are using EL1 dedicated stack pointer. 
+* `#define SPSR_MASK_ALL        (7 << 6)` ELをEL1に変更した後、すべての種類の割り込みをマスクします（または無効にします。同じ意味です）。
+* `#define SPSR_EL1h        (5 << 0)` EL1では、専用のスタックポインタを使用するか、EL0のスタックポインタのいずれかを使用することができます。`EL1h`モードは、EL1専用のスタックポインタを使用しているすることを意味します。
 
-#### ELR_EL3, Exception Link Register (EL3), Page 351 of AArch64-Reference-Manual.
+#### ELR_EL3, 例外リンクレジスタ (EL3), AArch64レファレンスマニュアルの351ページ
 
 ```
-    adr    x0, el1_entry        
+    adr    x0, el1_entry
     msr    elr_el3, x0
 
-    eret                
+    eret
 ```
 
-`elr_el3` holds the address, to which we are going to return after `eret` instruction will be executed. Here we set this address to the location of `el1_entry` label.
+`elr_el3`には`eret`命令が実行された後に復帰するアドレスが格納されます。
+ここでは、このアドレスに`el1_entry`ラベルの位置を設定しています。
 
-### Conclusion
+### 結論
 
-That is pretty much it: when we enter `el1_entry` function the execution should be already at EL1 mode. Go ahead and try it out! 
+だいたいこんな感じです。`el1_entry`関数に入ると、すでにEL1モードで実行
+されているはずです。さあ、試してみてください。
 
-##### Previous Page
+##### 前ページ
 
-1.5 [Kernel Initialization: Exercises](../../docs/lesson01/exercises.md)
+1.5 [カーネルの初期化: 演習](../../docs/lesson01/exercises.md)
 
-##### Next Page
+##### 次ページ
 
-2.2 [Processor initialization: Linux](../../docs/lesson02/linux.md)
+2.2 [プロセッサの初期化: Linux](../../docs/lesson02/linux.md)
