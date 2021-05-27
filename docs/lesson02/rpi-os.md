@@ -13,13 +13,13 @@ ARM.v8アーキテクチャに対応したARMプロセッサには4つの例外�
 ほとんど汎用レジスタ（X0～X30）とスタックポインタレジスタ（SP）しか使用しません。
 EL0では、`STR`コマンドと`LDR`コマンドを使用して、メモリとの間でデータのロードと
 ストアを行うことができます。また、ユーザープログラムでよく使われるいくつかの
-目入れも使用することができます。
+命令も使用することができます。
 
 オペレーティングシステムはプロセスの隔離を実現する必要があるので例外レベルを
 扱う必要があります。ユーザプロセスが他のプロセスのデータにアクセスできては
 いけません。このような動作を実現するためにOSはユーザプロセスを常にEL0で動作
 させます。この例外レベルで動作する場合、プロセスは自身の仮想メモリしか使用
-できず、仮想メモリの設定を変更する命令にもアクセスできません。このように
+できず、仮想メモリの設定を変更する命令にはアクセスできません。このように
 プロセスの隔離を確保するために、OSはプロセスごとに個別の仮想メモリのマッピングを
 用意し、プロセッサをEL0にしてからユーザプロセスに実行を移す必要があります。
 
@@ -55,7 +55,7 @@ RPi OSのために車輪の再発明はせず、 [既存のpritfの実装](http:
 開発者の観点からはあまり面白いものではありません。私が使った実装は非常に小さく、
 外部依存性がないので、カーネルに簡単に組み込むことができます。私がしなければ
 ならないことは、スクリーンに一文字を送信することができる`putc`関数を定義する
-ことだけです。この関数は[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/mini_uart.c#L59)で定義されており、既存の`uart_send`
+ことだけです。この関数は[`mini_uart.c#L59`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/mini_uart.c#L59)で定義されており、既存の`uart_send`
 関数を利用しているだけです。また、`printf`ライブラリを初期化し、`putc`関数の
 場所を指定する必要もあります。これは[一行のコード](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/kernel.c#L8)でできます。
 
@@ -63,7 +63,7 @@ RPi OSのために車輪の再発明はせず、 [既存のpritfの実装](http:
 
 さて、`printf`関数が使えるようになったので、本来の目的である「OSがどの例外
 レベルで起動されたのか」を解明できるようになりました。この質問に答えることが
-できる小さな関数が[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/utils.S#L1) で定義されています。次のようなものです。
+できる小さな関数が[`utils.S#L1`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/utils.S#L1) で定義されています。次のようなものです。
 
 ```
 .globl get_el
@@ -96,7 +96,7 @@ ELから抜け出すことができ、他のプログラムのデータにアク
 プログラムが何らかの不正な命令を実行した場合に起こります（たとえば、
 存在しないアドレスのメモリ位置にアクセスしたり、0で割ろうとした場合です）。
 また、アプリケーションは例外を発生させるのを目的として`svc`命令を実行
-することができます。ハードウェアが生成する割込みも特殊な種類の例外として
+することができます。ハードウェアが生成する割込みも特殊なタイプの例外として
 扱われます。例外が発生すると、次のような手順で処理されます（ここでは、
 EL `n`で例外が処理されると仮定します。`n`は1、2、3のいずれかです）。
 
@@ -109,7 +109,7 @@ EL `n`で例外が処理されると仮定します。`n`は1、2、3のいず�
    `SPSR_ELn`から復元し、`ELR_ELn`レジスタに格納されているアドレスから
    実行を再開します。
 
-実際には、例外ハンドラはすべての汎用レジスタの状態も保存し、その後復元する
+実際には、例外ハンドラはすべての汎用レジスタの状態も保存し、後で復元する
 必要があるため、プロセスはもう少し複雑になります。このプロセスについては
 次回のレッスンで詳しく説明します。現時点では、一般的なプロセスを理解し、
 `ELR_ELn`と`SPSR_ELn`レジスタの意味を覚えておけばよいでしょう。
@@ -164,9 +164,9 @@ master:
 EL1で動作する際のプロセッサのさまざまなパラメータを設定する役割を果たします。
 たとえば、キャッシュを有効にするか否かや、私たちにとって最も重要なMMU(メモリ
 管理ユニット）を作動させるか否かなどを制御します。`sctlr_el1`は、EL1以上の
-すべての例外レベルからアクセスできます（`_el1`という後置詞xから推測できます）。
+すべての例外レベルからアクセスできます（`_el1`という後置詞から推測できるでしょう）。
 
-`SCTLR_VALUE_MMU_DISABLED`定数は、[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L16)で
+`SCTLR_VALUE_MMU_DISABLED`定数は、[`sysregs.h#L16`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L16)で
 定義されています。この値の各ビットは次のように定義されています。
 
 * `#define SCTLR_RESERVED                  (3 << 28) | (3 << 22) | (1 << 20) | (1 << 11)` `sctlr_el1`レジスタの説明の中でいくつかのビットは`RES1`とマークされています。これらのビットは将来の使用のために予約されており，`1`で初期化する必要があります。
@@ -186,7 +186,7 @@ EL1で動作する際のプロセッサのさまざまなパラメータを設�
 私たちは独自の [ハイパーバイザ](https://en.wikipedia.org/wiki/Hypervisor)を
 実装する予定はありません。しかし、このレジスタを使用する必要があります。
 中でも、このレジスタはEL1での実行状態を制御するからです。実行状態は
-`AArch32`ではなく、`AArch64`でなければなりません。これは[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L22)で設定しています。
+`AArch32`ではなく、`AArch64`でなければなりません。これは[`sysregs.h#L22`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L22)で設定しています。
 
 #### SCR_EL3, セキュア構成レジスタ (EL3), AArch64レファレンスマニュアルの2648ページ
 
@@ -199,7 +199,9 @@ EL1で動作する際のプロセッサのさまざまなパラメータを設�
 すべての下位レベルを「セキュア」または「ノンセキュア」のどちらの状態で
 実行するかを制御します。また、EL2での実行状態も制御します。ここでは、
 EL2では`AArch64`状態で実行し、下位の例外レベルはすべて「ノンセキュア」に
-なるように[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L26)で設定しています。
+なるように[`sysregs.h#L26`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L26)で設定しています。
+
+> **訳注**: QEMUではEL2で実行されるため、このレジスタにはアクセスできない。そのため、QEMUで実行する場合は、この2行は削除する。
 
 #### SPSR_EL3, プログラム状態保存レジスタ (EL3), AArch64レファレンスマニュアルの389ページ
 
@@ -234,7 +236,9 @@ Zフラグが1にセットされているかをテストすることでこれを
 以下のフィールドを初期化しています。
 
 * `#define SPSR_MASK_ALL        (7 << 6)` ELをEL1に変更した後、すべての種類の割り込みをマスクします（または無効にします。同じ意味です）。
-* `#define SPSR_EL1h        (5 << 0)` EL1では、専用のスタックポインタを使用するか、EL0のスタックポインタのいずれかを使用することができます。`EL1h`モードは、EL1専用のスタックポインタを使用しているすることを意味します。
+* `#define SPSR_EL1h        (5 << 0)` EL1では、専用のスタックポインタを使用するか、EL0のスタックポインタのいずれかを使用することができます。`EL1h`モードは、EL1専用のスタックポインタを使用することを意味します。
+
+> **訳注**: QEMUではEL2で実行されるため、同じ設定を`spsr_el2`に対して行います。
 
 #### ELR_EL3, 例外リンクレジスタ (EL3), AArch64レファレンスマニュアルの351ページ
 
@@ -248,10 +252,22 @@ Zフラグが1にセットされているかをテストすることでこれを
 `elr_el3`には`eret`命令が実行された後に復帰するアドレスが格納されます。
 ここでは、このアドレスに`el1_entry`ラベルの位置を設定しています。
 
+> **訳注**: QEMUではEL2で実行されるため、同じ設定を`elr_el2`に対して行います。
+
 ### 結論
 
 だいたいこんな感じです。`el1_entry`関数に入ると、すでにEL1モードで実行
 されているはずです。さあ、試してみてください。
+
+
+```bash
+$ make run
+aarch64-none-elf-gcc -Iinclude -MMD -c src/boot.S -o build/boot_s.o
+aarch64-none-elf-ld -T src/linker.ld -o build/kernel8.elf  build/kernel_c.o build/mini_uart_c.o build/printf_c.o build/boot_s.o build/mm_s.o build/utils_s.o
+aarch64-none-elf-objcopy build/kernel8.elf -O binary kernel8.img
+qemu-system-aarch64 -m 1024 -M raspi3 -serial null -serial mon:stdio -nographic -kernel kernel8.img
+Exception level: 1
+```
 
 ##### 前ページ
 
