@@ -59,7 +59,7 @@ OS開発のスキルは必要ありません。
     * 3.3 [Interrupt controllers](docs/lesson03/linux/interrupt_controllers.md)
     * 3.4 [Timers](docs/lesson03/linux/timer.md)
   * 3.5 [演習](docs/lesson03/exercises.md)
-* **Lesson 4: Process scheduler**
+* **Lesson 4: プロセススケジューラ**
   * 4.1 [RPi OS](docs/lesson04/rpi-os.md)
   * Linux
     * 4.2 [Scheduler basic structures](docs/lesson04/linux/basic_structures.md)
