@@ -65,7 +65,7 @@ OS開発のスキルは必要ありません。
     * 4.2 [Scheduler basic structures](docs/lesson04/linux/basic_structures.md)
     * 4.3 [Forking a task](docs/lesson04/linux/fork.md)
     * 4.4 [Scheduler](docs/lesson04/linux/scheduler.md)
-  * 4.5 [Exercises](docs/lesson04/exercises.md)
+  * 4.5 [演習](docs/lesson04/exercises.md)
 * **Lesson 5: User processes and system calls**
   * 5.1 [RPi OS](docs/lesson05/rpi-os.md)
   * 5.2 [Linux](docs/lesson05/linux.md)
