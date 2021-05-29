@@ -597,9 +597,9 @@ Calleeが保存したレジスタを次のプロセスの`cpu_context`から復�
 関数を呼び出し、タスク　1の実行を決定します。
 5. [cpu_switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.S#L4)は
 calee保存レジスタをカーネルイメージ内にあるinitタスクの`cpu_context`に保存します。
-6. `cpu_switch_to`はタスク　1の`cpu_context`からcalee保存レジスタを復元します。この
-段階で、`sp`は[ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L146)
-関数へのリンクレジスタである`0x00401000`を指しており、`x19`は[process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L9)
+6. `cpu_switch_to`はタスク 1の`cpu_context`からcalee保存レジスタを復元します。この
+段階で、`sp`は`0x00401000`を、リンクレジスタは[ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L146)
+関数を指しており、`x19`は[process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L9)
 関数へのポインタを、`x20`はカーネルイメージ内のどこかにある文字列 "12345" への
 ポインタを保持しています。
 7. `cpu_switch_to`は`ret`命令を呼び出し、`ret_from_fork`関数にジャンプします。
