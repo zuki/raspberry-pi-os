@@ -66,10 +66,10 @@ OS開発のスキルは必要ありません。
     * 4.3 [Forking a task](docs/lesson04/linux/fork.md)
     * 4.4 [Scheduler](docs/lesson04/linux/scheduler.md)
   * 4.5 [演習](docs/lesson04/exercises.md)
-* **Lesson 5: User processes and system calls**
+* **Lesson 5: ユーザプロセスとシステムコール**
   * 5.1 [RPi OS](docs/lesson05/rpi-os.md)
   * 5.2 [Linux](docs/lesson05/linux.md)
-  * 5.3 [Exercises](docs/lesson05/exercises.md)
+  * 5.3 [演習](docs/lesson05/exercises.md)
 * **Lesson 6: Virtual memory management**
   * 6.1 [RPi OS](docs/lesson06/rpi-os.md)
   * 6.2 Linux (In progress)

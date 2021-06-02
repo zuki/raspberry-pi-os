@@ -1,13 +1,17 @@
-## 5.3: Exercises
+## 5.3: 演習
 
-1. When a task is executed in user mode, try to access some of the system registers. Make sure that a synchronous exception is generated in this case. Handle this exception, use `esr_el1` register to distinguish it from a system call.
-1. Implement a new system call that can be used to set current task priority. Demonstrate how priority changes are dynamically applied while the task is running. 
-1. Adapt lesson 05 to run on qemu. Check [this](https://github.com/s-matyukevich/raspberry-pi-os/issues/8) issue for reference.
+1. タスクがユーザモードで実行されているときに、システムレジスタにアクセスして
+ください。この場合、同期例外が発生することを確認してください。この例外を処理して
+ください。システムコールと区別するには`esr_el1`レジスタを使用してください。
+2. カレントタスクの優先度を設定するために使用できる新しいシステムコールを
+実装してください。タスクの実行中に優先度の変更が動的に適用される様子を示して
+ください。
+3. レッスン05をqemu上で実行できるようにしてください。[このissue](https://github.com/s-matyukevich/raspberry-pi-os/issues/8)を参考にしてください。
 
-##### Previous Page
+##### 前ページ
 
-5.2 [User processes and system calls: Linux](../../docs/lesson05/linux.md)
+5.2 [ユーザプロセスとシステムコール: Linux](../../docs/lesson05/linux.md)
 
-##### Next Page
+##### 次ページ
 
-6.1 [Virtual memory management: RPi OS](../../docs/lesson06/rpi-os.md)
+6.1 [仮想メモリ管理: RPi OS](../../docs/lesson06/rpi-os.md)
