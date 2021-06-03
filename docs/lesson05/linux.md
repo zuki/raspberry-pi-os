@@ -1,12 +1,21 @@
-## 5.2: User processes and system calls 
+## 5.2: ユーザプロセスとシステムコール
 
-This chapter is going to be a short one. The reason is that I copied syscall implementation from Linux to RPi OS almost precisely, therefore it doesn't require a lot of explanations. But still I want to guide you through the Linux source code so that you can see where and how a particular syscall functionality is implemented.
+この章は短いものにします。その理由は、syscallの実装はLinuxからRPi OSに
+ほぼ正確にコピーしたので多くの説明を必要としないからです。しかし、それでも
+Linuxのソースコードを見ることで、特定のsyscall機能がどこでどのように実装されて
+いるかを確認できるようにしたいと思います。
 
-### Creating first user process
+### 最初のユーザプロセスを作成する
 
-The first question we are going to tackle is how the first user process is created.  A good place to start looking for the answer is [start_kernel](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L509) function - as we've seen previously, this is the first architecture independent function that is called early in the kernel boot process. This is where the kernel initialization begins, and it would make sense to run the first user process during kernel initialization.
+これから取り組む最初の質問は、最初のユーザープロセスがどのように作成されて
+いるかです。その答えを探すのに良い場所は[start_kernel](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L509)
+関数です。前に見たように、これは、カーネルブートプロセスの初期に呼び出される
+アーキテクチャに依存しない最初の関数です。ここはカーネルの初期化が始まる
+場所でり、カーネルの初期化の中で最初のユーザプロセスを実行するのは理に
+かなっていると考えられます。
 
-An indeed, if you follow the logic of `start_kernel` you will soon discover [kernel_init](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L989) function that has the following code.
+実際、`start_kernel`のロジックをたどっていくとすぐに、次のようなコードを
+持つk[kernel_init](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L989) 関数が見つかります。
 
 ```
     if (!try_to_run_init_process("/sbin/init") ||
@@ -16,9 +25,21 @@ An indeed, if you follow the logic of `start_kernel` you will soon discover [ker
         return 0;
 ```
 
-It looks like this is precisely what we are looking for. From this code we can also infer where exactly and in which order Linux kernel looks for the `init` user program. `try_to_run_init_process` then executes [do_execve](https://github.com/torvalds/linux/blob/v4.14/fs/exec.c#L1837) function, which is also responsible for handling [execve](http://man7.org/linux/man-pages/man2/execve.2.html) system call. This system call reads a binary executable file and runs it inside the current process.
+これはまさに私たちが探しているもののようです。このコードから、Linuxカーネルが
+`init`ユーザプログラムを正解にどこから、どの順番で探すのかを推測できます。`try_to_run_init_process`は[do_execve](https://github.com/torvalds/linux/blob/v4.14/fs/exec.c#L1837)
+関数を実行します。この関数は[execve](http://man7.org/linux/man-pages/man2/execve.2.html)
+システムコールの処理も担当しています。このシステムコールはバイナリ実行
+ファイルを読み込んで、カレントプロセス内で実行します。
 
-The logic behind the `execve` system call will be explored in details in the lesson 9, for now, it will be enough to mention that the most important work that this syscall does is parsing executable file and loading its content into memory, and it is done inside [load_elf_binary](https://github.com/torvalds/linux/blob/v4.14/fs/binfmt_elf.c#L679) function. (Here we assume that the executable file is in [ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format) format - it is the most popular, but not the only choice) At the end of `load_elf_binary` method (actually [here](https://github.com/torvalds/linux/blob/v4.14/fs/binfmt_elf.c#L1149)) there is a call to architecture specific [start_thread](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/processor.h#L119) function. I used it as a prototype for the RPi OS `move_to_user_mode` routine, and this is the code that we mostly care about. Here it is.
+`execve`システムコールのロジックについてはレッスン9で詳しく説明しますが、
+今のところは、このシステムコールが行う最も重要な作業は、実行ファイルの解析と
+その内容のメモリへのロードであると述べておくだけで十分でしょう。これは
+[load_elf_binary](https://github.com/torvalds/linux/blob/v4.14/fs/binfmt_elf.c#L679)関数で行われます（ここで実行ファイルは[ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)フォーマットであると想定しています。
+このフォーマットは最も一般的なものですがゆういつの選択肢ではありません）。
+`load_elf_binary`メソッドの最後（[`binfmt_elf.c#L1149`](https://github.com/torvalds/linux/blob/v4.14/fs/binfmt_elf.c#L1149)にあります）には、
+アーキテクチャ固有の[start_thread](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/processor.h#L119)関数の呼び出しもあります。私は
+これをRPi OSの`move_to_user_mode`ルーチンのプロトタイプとして使用しました。
+これは私たちが最も注目するコードです。これがそのコードです。
 
 ```
 static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
@@ -37,13 +58,28 @@ static inline void start_thread(struct pt_regs *regs, unsigned long pc,
 }
 ```
 
-By the time `start_thread` is executed, the current process operates in the kernel mode. `start_thread` is given access to the current `pt_regs` struct, which is used to set saved `pstate`, `sp` and `pc` fields. The logic here is exactly the same as in the RPi OS `move_to_user_mode` function, so I don't want to repeat it one more time. An important thing to remember is that `start_thread` prepares saved processor state in such a way that `kernel_exit` macro will eventually move the process to user mode.
+`start_thread`が実行されるまで、カレントプロセスはカーネルモードで動作して
+います。`start_thread`には現在のカレントプロセスの`pt_regs`構造体にアクセス
+する権利が与えられており、保存する`pstate`、`sp`、`pc`の各フィールドを設定
+するために使用されます。このロジックはRPi OSの`move_to_user_mode`関数と
+まったく同じなのでもう一度繰り返したくはありません。重要なことは
+`start_thread`は、`kernel_exit`マクロが最終的にプロセスをユーザモードに
+移行させるような方法でプロセッサの保存状態を準備することです。
 
-###  Linux syscalls
+###  Linuxのシステムコール
 
-It would be no surprise to you that the primary syscall mechanism is exactly the same in Linux and RPi OS. Now we are going to use already familiar [clone](http://man7.org/linux/man-pages/man2/clone.2.html) syscall to understand the details of this mechanism. It would make sense to start our exploration with the [glibc clone wrapper function](https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/aarch64/clone.S;h=e0653048259dd9a3d3eb3103ec2ae86acb43ef48;hb=HEAD#l35). It works exactly the same as [call_sys_clone](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson05/src/sys.S#L22) function in the RPi OS, with the exception that the former function performers arguments sanity check and handles exceptions properly. An important thing to remember and understand is that in both cases we are using `svc` instruction to generate a synchronous exception, syscall number is passed using `x8` register and all arguments are passed in registers `x0` - `x7`.
+システムコールの主な仕組みがLinuxとRPi OSで全く同じであることは驚くことでは
+ありません。ここでは既におなじみの[clone](http://man7.org/linux/man-pages/man2/clone.2.html)
+システムコールを使って，このメカニズムの詳細を理解しましょう。[glibcのclone ラッパー関数](https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/aarch64/clone.S;h=e0653048259dd9a3d3eb3103ec2ae86acb43ef48;hb=HEAD#l35)
+から調査を始めるのがよいでしょう。この関数はRPi OSの[call_sys_clone](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson05/src/sys.S#L22)
+関数と全く同じように動作しますが，前者の関数は引数のサニティチェックを行う
+ことと例外を適切に処理することが異なります。理解し覚えておくことが重要な
+ことは、どちらの場合も`svc`命令を使って同期例外を発生させていること、
+システムコール番号は`x8`レジスタを使って渡されること、すべての引数は
+`x0 - x7`レジスタで渡されることです。
 
-Next, let's take a look at how `clone` syscall is defined. The definition can be found [here](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2153) and looks like this.
+次に、`clone`システムコールがどのように定義されているかを見てみましょう。
+定義は[`fork.c#L2153`](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2153)にあり、以下のようになっています。
 
 ```
 SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
@@ -54,24 +90,50 @@ SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
     return _do_fork(clone_flags, newsp, 0, parent_tidptr, child_tidptr, tls);
 }
 ```
-[SYSCALL_DEFINE5](https://github.com/torvalds/linux/blob/v4.14/include/trace/syscall.h#L25) macro has number 5 in its name indicating that we are defining a syscall with 5 parameters.  The macro allocates and populates new [syscall_metadata](https://github.com/torvalds/linux/blob/v4.14/include/trace/syscall.h#L25) struct and creates `sys_<syscall name>` function. For example, in case of the `clone`  syscall `sys_clone` function will be defined - this is the actuall syscall handler that will be called from the low-level architecture code.
 
-When a syscall is executed, the kernel needs a way to find syscall handler by the syscall number. The easiest way to achieve this is to create an array of pointers to syscall handlers and use syscall number as an index in this array. This is the approach we used in the RPi OS and exactly the same approach is used in the Linux kernel. The array of pointers to syscall handlers is called [sys_call_table](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/sys.c#L62) and is defined like this.
+[SYSCALL_DEFINE5](https://github.com/torvalds/linux/blob/v4.14/include/trace/syscall.h#L25)
+マクロの名前に数字の5が入っているのは、5つのパラメータを持つシステムコールを
+定義することを示しています。このマクロは新規[syscall_metadata](https://github.com/torvalds/linux/blob/v4.14/include/trace/syscall.h#L25)
+構造体を割り当て、データを設定して`sys_<syscall name>`関数を作成します。
+たとえば，`clone`システムコールの場合は`sys_clone`関数が定義されます。
+この関数は低レベルアーキテクチャコードから呼び出される実際のシステムコール
+ハンドラです。
+
+システムコールを実行する際、カーネルがシステムコール番号からシステムコール
+ハンドラを見つける方法が必要です。これを実現する最も簡単な方法は、システム
+コールハンドラへのポインタの配列を作成し、システムコール番号をこの配列の
+インデックスとして使用することです。これはRPi OSで採用した方法であり、
+Linuxカーネルでも全く同じ方法が採用されています。システムコールハンドラへの
+ポインタの配列は[sys_call_table](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/sys.c#L62)と呼ばれ、次のように定義されています。
 
 ```
 void * const sys_call_table[__NR_syscalls] __aligned(4096) = {
     [0 ... __NR_syscalls - 1] = sys_ni_syscall,
 #include <asm/unistd.h>
 };
-``` 
+```
 
-All syscalls are initially allocated to point to `sys_ni_syscall` function ("ni" here means "non-existent"). Syscall with number `0` and all syscalls that aren't defined for the current architecture will keep this handler. All other syscall handlers in the `sys_call_table` array are rewritten in the [asm/unistd.h](https://github.com/torvalds/linux/blob/v4.14/include/uapi/asm-generic/unistd.h) header file. As you might see, this file simply provides a mapping between syscall number and syscall handler function.
+すべてのシスコールは初期状態では`sys_ni_syscall`関数を指すように割り当て
+られています（ここで"ni"は"non-existent"を意味します）。番号0のシスコールと
+カレントアーキテクチャで定義されていないすべてのシスコールにはこのハンドラが
+使用されます。`sys_call_table`配列に含まれるその他のすべてのシスコール
+ハンドラは[asm/unistd.h](https://github.com/torvalds/linux/blob/v4.14/include/uapi/asm-generic/unistd.h)
+ヘッダファイルで再定義されています。ご覧の通り、このファイルはシステムコール
+番号とシステムコールハンドラ関数のマッピングを提供しているだけです。
 
-### Low-level syscall handling code
+### 低レベルシステムコール処理コード
 
-Ok, we've seen how `sys_call_table` is created and populated, now it is time to investigate how it is used by the low-level syscall handling code. And once again the basic mechanism here will be almost exactly the same as in the RPi OS. 
+`sys_call_table`がどのように作成され、データが登録されているかを見てきました。
+今度は、低レベルのシステムコール処理コードがこれをどのように使用するかを
+調べてみましょう。繰り返しになりますが、基本的なメカニズムはRPi OSと
+ほとんど変わりません。
 
-We know that any syscall is a synchronous exception and all exception handlers are defined in the exception vector table (it is our favorite [vectors](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L367) array). The handler that we are interested in should be the one that handles synchronous exceptions generated at EL0. All of this makes it trivial to find the right handler, it is called [el0_sync](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L598) and looks like the following.
+すべてのシステムコールは同期例外であり、例外ハンドラはすべて例外ベクタ
+テーブル（お気に入りの[vectors](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L367)
+配列です）で定義されていることは知っています。そこで、私たちが注目すべき
+ハンドラはEL0で発生する同期例外を処理するものです。これらのことから、
+正しいハンドラの発見は簡単です。それは[el0_sync](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L598)と呼ばれるもので、以下の
+ような形をしています。
 
 ```
 el0_sync:
@@ -101,7 +163,9 @@ el0_sync:
     b    el0_inv
 ```
 
-Here `esr_el1` (exception syndrome register) is used to figure out whether the current exception is a system call. If this is the case [el0_svc](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L837) function is called. This function is listed below.
+ここでは`esr_el1`（exception syndromeレジスタ）を使って、現在の例外が
+システムコールであるか否かを判定します。もしそうであれば、[el0_svc](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L837)
+関数を呼び出します。この関数を以下に示します。
 
 ```
 el0_svc:
@@ -128,7 +192,7 @@ ni_sys:
 ENDPROC(el0_svc)
 ```
 
-Now, let's examine it line by line.
+では、一行ずつ見ていきましょう。
 
 ```
 el0_svc:
@@ -137,25 +201,31 @@ el0_svc:
     mov    wsc_nr, #__NR_syscalls
 ```
 
-The first 3 lines initialize `stbl`, `wscno` and `wsc_nr` variables that are just aliases for some registers. `stbl` holds the address of the syscall table, `wsc_nr` contains the total number of system calls and `wscno` is the current syscall number from `w8` register. 
+最初の3行は`stbl`、`wscno`、`wsc_nr`という変数を初期化していますが、
+これらは単なるレジスタのエイリアスです。`stbl`はシステムコールテーブルの
+アドレスを、`wsc_nr`はシステムコールの総数を、`wscno`は`w8`レジスタにある
+現在のシスコール番号を表しています。
 
 ```
     stp    x0, xscno, [sp, #S_ORIG_X0]    // save the original x0 and syscall number
 ```
 
-As you might remember from our RPi OS syscall discussion, `x0` is overwritten in the `pt_regs` area after a syscall finishes. In case when original value of the `x0` register might be needed, it is saved in the separate field of the `pt_regs` struct. Similarly syscall number is also saved in the `pt_regs`.
+RPi OSのシステムコールに関する説明を覚えているかもしれませんが、`pt_regs`
+領域にある`x0`はシステムコールが終了すると上書きされます。`x0`レジスタの
+元の値が必要な場合は、`pt_regs`構造体の別のフィールドに保存します。同様に、
+システムコール番号も`pt_regs`に保存します。
 
 ```
     enable_dbg_and_irq
 ```
 
-Interrupts and debug exceptions are enabled.
+割り込みとデバッグ例外を有効にします。
 
 ```
     ct_user_exit 1
-``` 
+```
 
-The event of switching from the user mode to the kernel mode is recorded.
+ユーザモードからカーネルモードへ切り替えるというイベントを記録します。
 
 ```
     ldr    x16, [tsk, #TSK_TI_FLAGS]    // check for syscall hooks
@@ -164,14 +234,18 @@ The event of switching from the user mode to the kernel mode is recorded.
 
 ```
 
-In case the current task is executed under a syscall tracer `_TIF_SYSCALL_WORK` flag should be set. In this case, `__sys_trace` function will be called. As our discussion is only focused on the general case, we are going to skip this function.
+カレントタスクがシステムコールトレーサの下で実行されている場合は
+`_TIF_SYSCALL_WORK`フラグが設定されているはずです。その場合は`_sys_trace`
+関数を呼び出します。ここでは、一般的なケースだけに焦点を当てているので、
+この関数は省略します。
 
 ```
     cmp     wscno, wsc_nr            // check upper syscall limit
     b.hs    ni_sys
 ```
 
-If current syscall number is greater then total syscall count an error is returned to the user.
+現在のシステムコール番号がシステムコールの総数よりも大きい場合は、
+エラーをユーザに返します。
 
 ```
     ldr    x16, [stbl, xscno, lsl #3]    // address in the syscall table
@@ -179,7 +253,9 @@ If current syscall number is greater then total syscall count an error is return
     b    ret_fast_syscall
 ```
 
-Syscall number is used as an index in the syscall table array to find the handler. Then handler address is loaded into `x16` register and it is executed. Finally `ret_fast_syscall` function is called. 
+システムコール番号をシステムコールテーブル配列のインデックスとして使用して
+ハンドラを見つけます。見つけたらハンドラのアドレスを`x16`レジスタにロードして
+実行します。最後に`ret_fast_syscall`関数を呼び出します。
 
 ```
 ret_fast_syscall:
@@ -193,16 +269,23 @@ ret_fast_syscall:
     enable_step_tsk x1, x2
     kernel_exit 0
 ```
-The important things here are the first line, were interrupts are disabled, and the last line, were `kernel_exit` is called - everything else is related to special case processing. So as you might guess this is the place where a system call actually finishes and execution is transfered to user process.
 
-### Conclusion
+ここで重要なのは、割り込みを禁止している最初の行と、`kernel_exit`を呼び
+出している最後の行です。それ以外はすべて特殊なケースの処理に関連するものです。
+つまり、お察しの通り、ここがシステムコールが実際に終了し、実行がユーザ
+プロセスに移される場所です。
 
-We've now gone through the process of generating and processing a system call. This process is relatively simple, but it is vital for the OS, because it allows the kernel to set up an API and make sure that this API is the only mean of communication between a user program and the kernel.
+### 結論
 
-##### Previous Page
+システムコールの生成と処理の家庭を説明してきました。このプロセスは比較的
+単純ですが、OSにとっては非常に重要です。なぜなら、カーネルがAPIを設定する
+ことを可能とし、このAPIがユーザプログラムとカーネル間の唯一の通信手段で
+あることを保証するからです。
 
-5.1 [User processes and system calls: RPi OS](../../docs/lesson05/rpi-os.md)
+##### 前ページ
 
-##### Next Page
+5.1 [ユーザプロセスとシステムコール: RPi OS](../../docs/lesson05/rpi-os.md)
 
-5.3 [User processes and system calls: Exercises](../../docs/lesson05/exercises.md)
+##### 次ページ
+
+5.3 [ユーザプロセスとシステムコール: 演習](../../docs/lesson05/exercises.md)

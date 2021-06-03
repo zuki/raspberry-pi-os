@@ -64,7 +64,7 @@ OS開発のスキルは必要ありません。
   * Linux
     * 4.2 [スケジューラの基本構造体](docs/lesson04/linux/basic_structures.md)
     * 4.3 [タスクをフォークする](docs/lesson04/linux/fork.md)
-    * 4.4 [Scheduler](docs/lesson04/linux/scheduler.md)
+    * 4.4 [スケジューラ](docs/lesson04/linux/scheduler.md)
   * 4.5 [演習](docs/lesson04/exercises.md)
 * **Lesson 5: ユーザプロセスとシステムコール**
   * 5.1 [RPi OS](docs/lesson05/rpi-os.md)
