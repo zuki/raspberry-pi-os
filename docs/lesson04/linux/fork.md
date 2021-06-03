@@ -1,48 +1,92 @@
-## 4.3: Forking a task
+## 4.3: タスクをフォークする
 
-Scheduling is all about selecting a proper task to run from the list of available tasks. But before the scheduler will be able to do its job we need to somehow fill this list. The way in which new tasks can be created is the main topic of this chapter. 
+スケジューリングとは、利用可能なタスクのリストから実行する適切なタスクを選択する
+ことです。しかし、スケジューラが仕事をするにはこのリストをどうにかして埋める
+必要があります。新しいタスクを作成する方法がこの章の主なテーマです。
 
-For now, we want to focus only on kernel threads and postpone the discussion of user-mode functionality till the next lesson. However, not everywhere it will be possible, so be prepared to learn a little bit about executing tasks in user mode as well.
+今のところ、焦点はカーネルスレッドだけに当て、ユーザモードの機能性の議論は次の
+レッスンまで延期したいと思います。ただし、どこでも可能というわけではありません
+ので、ユーザモードでのタスク実行についても少し学ぶ準備をします。
 
-### Init task
+### Initタスク
 
-When the kernel is started there is a single task running: init task. The corresponding `task_struct` is defined [here](https://github.com/torvalds/linux/blob/v4.14/init/init_task.c#L20) and is initialized by [INIT_TASK](https://github.com/torvalds/linux/blob/v4.14/include/linux/init_task.h#L226) macro. This task is critical for the system because all other tasks in the system are derived from it.
+カーネルが起動すると1つのタスクが実行しています。initタスクです。対応する
+`task_struct`は[`init_task.c#L20`](https://github.com/torvalds/linux/blob/v4.14/init/init_task.c#L20)で
+定義されており、[INIT_TASK](https://github.com/torvalds/linux/blob/v4.14/include/linux/init_task.h#L226)マクロにより初期化されています。このタスクはシステムにとって
+重要です。システムの他のすべてのタスクはこのタスクから派生するからです。
 
-### Creating new tasks 
+### 新規タスクを作成する
 
-In Linux it is not possible to create a new task from scratch - instead, all tasks are forked from a currently running task. Now, as we've seen from were the initial task came from, we can try to explore how new tasks can be created from it. 
+Linuxでは新規タスクをゼロから作ることはできません。代わりに、すべてのタスクは
+現在実行中のタスクからフォークします。最初のタスクがどこから来たのかはすでに
+知っているので、そこから新規タスクをどのように作るかを探って行きましょう。
 
-There are 4 ways in which a new task can be created.
+新規タスクの作成には4つの方法があります。
 
-1. [fork](http://man7.org/linux/man-pages/man2/fork.2.html) system call creates a full copy of the current process, including its virtual memory and it is used to create new processes (not threads). This syscall is defined [here](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2116).
-1. [vfork](http://man7.org/linux/man-pages/man2/vfork.2.html) system call is similar to `fork` but it differs in that the child reuses parent virtual memory as well as stack, and the parent is blocked until the child finished execution. The definition of this syscall can be found [here](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2128).
-1. [clone](http://man7.org/linux/man-pages/man2/clone.2.html) system call is the most flexible one - it also copies the current task but it allows to customize the process using `flags` parameter and allows to configure the entry point for the child task. In the next lesson, we will see how `glibc` clone wrapper function is implemented - this wrapper allows to use `clone` syscall to create new threads. 
-1. Finally, [kernel_thread](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2109) function can be used to create new kernel threads. 
+1. [fork](http://man7.org/linux/man-pages/man2/fork.2.html) システムコールは、
+カレントプロセスの仮想メモリを含む完全なコピーを作成し、新規プロセス（スレッドでは
+ない）の作成に使用します。このシステムコールは[`fork.c#L2116`](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2116)で定義されています。
+2. [vfork](http://man7.org/linux/man-pages/man2/vfork.2.html) システムコールは
+`fork`と似ていますが、子が親の仮想メモリだけでなくスタックも再利用する点と
+子の実行が終わるまで親がブロックされる点が異なります。このシステムコールの定義は
+[`fork.c#L2128`](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2128)
+にあります。
+3. [clone](http://man7.org/linux/man-pages/man2/clone.2.html) システムコールは
+最も柔軟な方法であす。このシステムコールもカレントタスクをコピーしますが
+`flags`パラメータを使ってプロセスをカスタマイズしたり、子タスクのエントリ
+ポイントを設定したりすることができます。次のレッスンでは、`glibc`のcloneラッパー
+関数がどのように実装されているかを見ていきます。このラッパー関数は`clone`システム
+コールを使って新規スレッドを作成することもできます。
+4. 最後に、[kernel_thread](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2109) 関数は新規カーネルスレッドの作成に使用できます。
 
-All of the above functions calls [_do_fork](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2020), which accept the following arguments.
+これらの関数はすべて[_do_fork](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2020)を呼び出しますが、次の引数を受け付けます。
 
-* `clone_flags` Flags are used to configure fork behavior. The complete list of the flags can be found [here](https://github.com/torvalds/linux/blob/v4.14/include/uapi/linux/sched.h#L8).
-* `stack_start` In case of `clone` syscall this parameter indicates the location of the user stack for the new task. If 'kernel_thread' calls `_do_fork` this parameter points to the function that needs to be executed in a kernel thread.
-* `stack_size` In `arm64` architecture this parameter is only used in the case when `_do_fork` is called by `kernel_thread. It is a pointer to the argument that needs to be passed to the kernel thread function. (And yes, I also find the naming of the last two parameters misleading)
-* `parent_tidptr` `child_tidptr` Those 2 parameters are used only in `clone` syscall. Fork will store the child thread ID at the location `parent_tidptr` in the parent's memory, or it can store parent's ID at `child_tidptr`location.
-* `tls`  [Thread Local Storage](https://en.wikipedia.org/wiki/Thread-local_storage)
+* `clone_flags` フラグはフォークの振る舞いの設定に使用されます。フラグの完全な
+リストは[`sched.h#L8`](https://github.com/torvalds/linux/blob/v4.14/include/uapi/linux/sched.h#L8)にあります。
+* `stack_start` `clone`システムコールの場合、このパラメータは新規タスク用の
+ユーザスタックの場所を示します。`kernel_thread`が`_do_fork`を呼び出す場合は
+このパラメータはカーネルスレッドで実行する必要のある関数を指します。
+* `stack_size` `arm64`アーキテクチャでは，このパラメータは`_do_fork`が
+`kernel_thread'から呼び出される場合にのみ使用されます。これはカーネルスレッド
+関数に渡す必要のある引数へのポインタです（そう、私もこの2つのパラメータの
+名前は誤解を招くと思います）。
+* `parent_tidptr` `child_tidptr` この2つのパラメータは`close`システムコールでのみ
+使用されます。forkは小スレッドのIDを親のメモリの`parent_tidptr`の位置に格納
+しますが、親のIDを`parent_tidptr`の位置に格納することもできます。
+* `tls`  [スレッドローカルストレージ](https://en.wikipedia.org/wiki/Thread-local_storage)
 
-### Fork procedure
+### forkの手続き
 
-Next, I want to highlight the most important events that take place during `_do_fork` execution, preserving their order.
+次に、`_do_fork`の実行中に発生する最も重要なイベントを、その発生順に
+紹介します。
 
-1. [_do_fork](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2020) calls [copy_process](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1539)  `copy_process` is responsible for configuring new `task_struct`.
-1. `copy_process` calls [dup_task_struct](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L512), which allocates new `task_struct` and copies all fields from the original one. Actual copying takes place in the architecture-specific [arch_dup_task_struct](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/process.c#L244) 
-1. New kernel stack is allocated. If `CONFIG_VMAP_STACK` is enabled the kernel uses [virtually mapped stacks](https://lwn.net/Articles/692208/) to protect against kernel stack overflow. [link](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L525)
-1. Task's credentials are copied. [link](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1628)
-1. The scheduler is notified that a new task is forked. [link](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1727) 
-1. [task_fork_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L9063) method of the CFS scheduler class is called. This method updates `vruntime` value for the currently running task (this is done inside [update_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L827) function) and updates `min_vruntime` value for the current runqueue (inside [update_min_vruntime](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L514)). Then `min_vruntime` value is assigned to the forked task - this ensures that this task will be picked up next. Note, that at this point of time new task still hasn't been added to the `task_timeline`.
-1. A lot of different properties, such as information about filesystems, open files, virtual memory, signals, namespaces, are either reused or copied from the current task. The decision whether to copy something or reuse current property is usually made based on the `clone_flags` parameter. [link](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1731-L1765)
-1. [copy_thread_tls](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1766) is called which in turn calls architecture specific [copy_thread](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/process.c#L254) function. This function deserves a special attention because it works as a prototype for the [copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5) function in the RPi OS, and I want to investigate it deeper.
+1. [_do_fork](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2020) は
+[copy_process](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1539)を呼び出します。`copy_process`は新しい`task_struct`の設定を担当します。
+2. `copy_process`は[dup_task_struct](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L512)を呼び出します。この関数は新しい`task_struct`を割り当て、
+元のタスクからすべてのフィールドをコピーします。実際のコピー作業はアーキテクチャ
+固有の[arch_dup_task_struct](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/process.c#L244)で行われます。
+3. 新規カーネルタスクが割り当てられます。`CONFIG_VMAP_STACK`が有効な場合は、
+カーネルは[仮想マップドスタック](https://lwn.net/Articles/692208/)を使って
+カーネルスタックオーバーフローから保護します。[リンク](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L525)
+4. タスクのクレデンシャルがコピーされます。[・リンク](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1628)
+5. スケジューラに新規タスクがフォークされたことが通知されます。[リンク](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1727)
+6. CFSスケジューラクラスの[task_fork_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L9063)メソッドが呼び出されます。このメソッドは現在
+実行中の他スックの`vruntime`の値を更新します（これは[update_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L827)
+関数で行われ、（[update_min_vruntime](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L514)関数で）カレントランキューの`min_vruntime`を更新します）。
+そして、`min_runtime`値がフォークされたタスクに割り当てられます。これにより
+このタスクが次に選択されることが保証されます。なお、この時点では新規タスクはまだ
+`task_timeline`に追加されていないことに注意してください。
+7. ファイルシステムに関する情報やオープンファイル、仮想メモリ、シグナル、名前
+空間など数多くの様々なプロパティがカレントタスクから再利用またはコピーされます。
+カレントプロパティをコピーするか、再利用するかの判断は通常`clone_flags`パラメタ
+に基づいて行われます。[リンク](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1731-L1765)
+8. [copy_thread_tls](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L1766)が呼び出され、それがアーキテクチャ固有の[copy_thread](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/process.c#L254)
+関数を呼び出します。この関数は特に注目に値します。RPi OSにおける[copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5)
+関数のプロトタイプとなるからです。これについては更に深く調査したいと思います。
 
-### copy_thread
+### `copy_thread`関数
 
-The whole function is listed below.
+関数のソースを以下に示します。
 
 ```
 int copy_thread(unsigned long clone_flags, unsigned long stack_start,
@@ -93,25 +137,36 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
 }
 ```
 
-Some of this code can be already a little bit familiar to you. Let's dig dipper into it.
+このコードの中にはすでに少し馴染みのあるものもあるでしょう。それでは早速、
+コードを見てみましょう。
 
 ```
 struct pt_regs *childregs = task_pt_regs(p);
 ```
 
-The function starts with allocating new [pt_regs](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/ptrace.h#L119) struct. This struct is used to provide access to the registers, saved during `kernel_entry`. `childregs` variable then can be used to prepare whatever state we need for the newly created task. If the task then decides to move to user mode the state will be restored by the `kernel_exit` macro. An important thing to understand here is that [task_pt_regs](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/processor.h#L161) macro doesn't allocate anything - it just calculate the position on the kernel stack, were `kernel_entry` stores registers, and for the newly created task, this position will always be at the top of the kernel stack.
+この関数は新規[pt_regs](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/ptrace.h#L119)
+構造体の割り当てから始まります。この構造体は`kernel_entry`で保存されるレジスタ
+へのアクセスを提供するために使用されます。`childregs`変数は新規作成されるタスクに
+必要なあらゆる状態を準備するために使用できます。タスクがユーザーモードに移行する
+場合、その状態は`kernel_exit`マクロによって復元されます。ここで理解すべき重要な
+ことは[task_pt_regs](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/processor.h#L161)
+マクロは何も割り当てないということです。このマクロはカーネルスタック上の位置を
+計算するだけであり、それは`kernel_entry`がレジスタを保存する場所です。新規作成
+されたタスクではこの位置は常にカーネルスタックのトップになります。
 
 ```
 memset(&p->thread.cpu_context, 0, sizeof(struct cpu_context));
 ```
 
-Next, forked task `cpu_context` is cleared.
+次に、フォークしたタスクの`cpu_context`をクリアします。
 
 ```
 if (likely(!(p->flags & PF_KTHREAD))) {
 ```
-  
-Then a check is made to determine whether we are creating a kernel or a user thread. For now, we are interested only in kernel thread case and we will discuss the second option in the next lesson.
+
+そして、カーネルスレッドとユーザースレッドのどちらを作成しているかをチェック
+します。今のところ、カーネルスレッドにのみ関心があります。2番目のオプションに
+ついては次のレッスンで説明します。
 
   ```
   memset(childregs, 0, sizeof(struct pt_regs));
@@ -123,35 +178,70 @@ Then a check is made to determine whether we are creating a kernel or a user thr
   p->thread.cpu_context.x20 = stk_sz;
   ```
 
-  If we are creating a kernel thread `x19` and `x20` registers of the `cpu_context` are set to point to the function that needs to be executed (`stack_start`) and its argument (`stk_sz`). After CPU will be switched to the forked task, [ret_from_fork](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L942) will use those registers to jump to the needed function. (I don't quite understand why do we also need to set `childregs->pstate` here. `ret_from_fork` will not call `kernel_exit` before jumping to the function stored in `x19`, and even if the kernel thread decides to move to the user mode `childregs` will be overwritten anyway. Any ideas?)
-  
+カーネルスレッドを作成している場合、`cpu_context`の`x19`と`x20`レジスタは
+実行する必要のある関数 (`stack_start`) とその引数 (`stk_sz`) を指すように
+設定します。CPUがフォークされたタスクに切り替わると[ret_from_fork](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L942)は
+これらのレジスタを使って必要な関数にジャンプします。（ここで、なぜ
+`childregs->pstate`をセットする必要があるのかは私にはわかりません。
+`ret_from_fork`は`x19`に格納されている関数にジャンプする前に`kernel_exit`を
+呼び出すことはありませんし、仮にカーネルスレッドがユーザモードに移行することに
+なっても`childregs`はいずれにせよ上書きされてしまうからです。誰か教えて下さい。）
+
 ```
 p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
 p->thread.cpu_context.sp = (unsigned long)childregs;
 ```
 
-Next `cpu_context.pc` is set to `ret_from_fork` pointer - this ensures that we return to the `ret_from_fork` after the first context switch. `cpu_context.sp` is set to the location just below the `childregs`. We still need `childregs` at the top of the stack because after the kernel thread finishes its execution the task will be moved to user mode and `childregs` structure will be used. In the next lesson, we will discuss in details how this happens.
+次に、`cpu_context.pc`に`ret_from_fork`ポインタを設定します。これにより
+最初のコンテキストスイッチ後に`ret_from_fork`に返ることが保証されます。
+`cpu_context.sp`には`childregs`の直前の位置を設定します。依然として
+`childregs`はカーネルトップにある必要があります。なぜなら、カーネルスレッドが
+実行を終了すると、タスクはユーザーモードに移行し、`childregs`構造体が使用される
+からです。次回のレッスンでは、これがどのように行われるかを詳しく説明します。
 
-That's it about `copy_thread` function. Now let's return to the place in the fork procedure from where we left.
+以上、`copy_thread`関数について説明しました。では、先ほどのfork手続きの続きの
+場所に戻りましょう。
 
-### Fork procedure (continued)
+### forkの手続き（続き）
 
-1. After `copy_process` succsesfully prepares `task_struct` for the forked task `_do_fork` can now run it by calling [wake_up_new_task](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L2438). This is done [here](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2074). Then task state is changed to `TASK_RUNNING` and  [enqueue_task_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L4879) CFS method is called, wich triggers execution of the [__enqueue_entity](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L549) that actually adds task to the `task_timeline` red-black tree.
+1. `copy_process`がフォークされるタスクの`task_struct`を正しく準備したら、
+`_do_fork`は[wake_up_new_task](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L2438)を
+呼び出してそのタスクを実行することができます。これは[`fork.c#L2074`](https://github.com/torvalds/linux/blob/v4.14/kernel/fork.c#L2074)で
+行っています。次に、タスクの状態を`TASK_RUNNING`に変更し、[enqueue_task_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L4879)
+ CFSメソッドが呼び出され、このメッソ度が実際にタスクを`task_timeline`赤黒木に
+ 追加する[__enqueue_entity](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L549)の
+ 実行を開始します。
 
-1. At [this](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L2463) line, [check_preempt_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L871) is called, which in turn calls [check_preempt_wakeup](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L6167) CFS method. This method is responsible for checking whether the current task should be preempted by some other task. That is exactly what is going to happen because we have just put a new task on the timeline that has minimal possible `vruntime`. So [resched_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L479) function is triggered, which sets `TIF_NEED_RESCHED` flag for the current task.
+2. [`core.c#L2463`](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L2463)では[check_preempt_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L871)を
+呼び出し、これが[check_preempt_wakeup](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L6167)
+ CFSメソッドを呼び出します。このメソッドはカレントタスクを他のタスクでプリエンプト
+するかチェックします。これはまさにするべきことです。なぜなら、最小の`vruntime`値を
+持つ新規タスクをタイムラインに追加したからです。そして、[resched_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L479)
+関数がトリガされ、カレントタスクに`TIF_NEED_RESCHED`フラグを設定します。
 
-1. `TIF_NEED_RESCHED` is checked just before the current task exit from an exception handler (`fork`, `vfork` and `clone` are all system call, and each system call is a special type of exception.). The check is made [here](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L801). Note that [_TIF_WORK_MASK](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/thread_info.h#L109) includes `_TIF_NEED_RESCHED`. It is also important to understand that in case of a kernel thread creation, the new thread will not be started until the next timer tick or until the parent task volatirely calls `schedule()`.
+3. カレントタスクが例外ハンドラ（`fork`, `vfork`, `clone`はいずれもシステム
+コールであり、それぞれのシステムコールは特別なタイプの例外です）から抜け出る
+直前に`TIF_NEED_RESCHED`がチェックされます。チェックは[`entry.S#L801`](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L801)で
+行われています。[_TIF_WORK_MASK](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/thread_info.h#L109)には`_TIF_NEED_RESCHED`が含まれていることに
+注意してください。また、カーネルスレッドの作成の場合、新規スレッドは次のタイマ
+ティックまで、あるいは親タスクが自発的に`schedule()`を呼び出すまで開始されない
+ことを理解しておくことも重要です。
 
-1. If the current task needs to be rescheduled, [do_notify_resume](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/signal.c#L744) is triggered, which in turn calls [schedule](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3418). Finally we reached the point where task scheduling is triggered, and we are going to stop at this point.
+4. カレントタスクを再スケジューリングする必要がある場合は、[do_notify_resume]が
+トリガーされ、これが[schedule](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3418)を
+呼び出します。ついにタスクのスケジューリングがトリガされるところまで来ましたので
+ここで終了します。
 
-### Conclusion
+### 結論
 
-Now that you understand how new tasks are created and added to the scheduler, it is time to take a look on how the scheduler itself works and how context switch is implemented. That is something we are going to explore in the next chapter.
+これで新規タスクが作成され、スケジューラに追加される方法を理解しました。
+次は、スケジューラ自体がどのように動作し、コンテキストスイッチがどのように
+実装されているかを見る時が来ました。これについては、次の章で紹介します。
 
-##### Previous Page
+##### 前ページ
 
-4.2 [Process scheduler: Scheduler basic structures](../../../docs/lesson04/linux/basic_structures.md)
+4.2 [プロセススケジューラ: スケジューラの基本構造体](../../../docs/lesson04/linux/basic_structures.md)
 
-##### Next Page
+##### 次ページ
 
-4.4 [Process scheduler: Scheduler](../../../docs/lesson04/linux/scheduler.md)
+4.4 [プロセススケジューラ: スケジューラ](../../../docs/lesson04/linux/scheduler.md)
