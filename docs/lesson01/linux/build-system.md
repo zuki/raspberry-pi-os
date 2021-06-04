@@ -43,7 +43,7 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   obj-y += some_file.o
   ```
 
-  ネストしたMakefileの例は[ここ](https://github.com/torvalds/linux/tree/v4.14/kernel/Makefile)にあります。
+  ネストしたMakefileの例は[この`Makefile`](https://github.com/torvalds/linux/tree/v4.14/kernel/Makefile)にあります。
 
 * 先に進む前に、基本的なmakeルールの構造を理解し、make用語に慣れておく
   必要があります。一般的なルールの構造を以下に図示します。
@@ -56,7 +56,7 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
 
     * `target`は、空白で区切られたファイル名です。targetはルールの
     実行後に生成されます。通常、1つのルールには1つのtargetだけです。。
-    * `prerequisites`は、ターゲットを更新する必要があるかどうかを`make`が
+    * `prerequisites`は、ターゲットを更新する必要があるか否かを`make`が
     確認するためのファイルです。
     * `recipe`は、bashスクリプトです。makeはprerequisitesの一部が更新されると
     このスクリプトを呼び出します。recipeはtargetの生成を担当します。
@@ -66,10 +66,10 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
     参照するために各々、変数`$<`と`$@`を使用することができます。これは
     [RPi OSのmakefile](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/Makefile#L14)ですでに使用しています。
 
-  makeルールの詳細については、[奇しきドキュメント](https://www.gnu.org/software/make/manual/html_node/Rule-Syntax.html#Rule-Syntax)を参照してください。
+  makeルールの詳細については、[公式ドキュメント](https://www.gnu.org/software/make/manual/html_node/Rule-Syntax.html#Rule-Syntax)を参照してください。
 
 * `make`は、前提条件が変更されていないかどうかを検出し、再構築が必要な
-  ターゲットだけを更新することは得意ですが、レシピが動的に更新されると
+  ターゲットだけを更新することは得意ですが、レシピが動的に更新されても
   `make`はこの変更を検出できません。どうしてそうなるのでしょうか。とても
   簡単です。一つの良い例は、何らかの設定変数を変更した結果、レシピに
   オプションが追加される場合です。このような場合、`make`はデフォルトでは
@@ -87,14 +87,14 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   ```
 
   ここでは、各`.c`ファイルに対して、`compile`という引数で`if_changed`関数を
-  呼び出して対応する`.o`ファイルをビルドします。`if_changed`は`cmd_compile`
-  変数を探し（最初の引数に`cmd_`というプレフィックスを追加します）、この変数が
+  呼び出して対応する`.o`ファイルをビルドします。`if_changed`は（最初の引数に
+  `cmd_`というプレフィックスを追加した）`cmd_compile`変数を探し、この変数が
   前回の実行後に更新されていないか、また、前提条件が変更されていないかを
   チェックします。変更されている場合、`cmd_compile`コマンドが実行され
   オブジェクトファイルが再生成されます。このサンプルルールでは、2つの前提
   条件があります。ソースファイル`.c`と`FORCE`です。`FORCE`は特別な前提条件で
   あり、`make`コマンドが呼び出されるたびにレシピが強制的に呼び出されます。
-  これがないと、`.c`ファイルが変更された場合にのみレシピが呼び出されます。
+  これがないと、`.c`ファイルが変更された場合にしかレシピが呼び出されません。
   `FORCE`ターゲットの詳細については[こちら](https://www.gnu.org/software/make/manual/html_node/Force-Targets.html)をご覧ください。
 
 ### カーネルのビルド
@@ -114,7 +114,7 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
 * `make help`コマンドの出力を見るとわかるかもしれませんが、カーネルのビルドを
   担当するデフォルトのターゲットは`vmlinux`と呼ばれています。
 
-* `vmlinux`ターゲットの定義は[ここ](https://github.com/torvalds/linux/blob/v4.14/Makefile#L1004)にあり、以下のようになっています。
+* `vmlinux`ターゲットの定義は[`Makefile#L1004`](https://github.com/torvalds/linux/blob/v4.14/Makefile#L1004)にあり、次のようになっています。
 
   ```
   cmd_link-vmlinux =                                                 \
@@ -125,21 +125,57 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
       +$(call if_changed,link-vmlinux)
   ```
 
-  This target uses already familiar to us `if_changed` function. Whenever some of the prerequsities are updated `cmd_link-vmlinux` command is executed. This command executes [scripts/link-vmlinux.sh](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh) script (Note usage of [$<](https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html) automatic variable in the `cmd_link-vmlinux` command). It also executes architecture specific [postlink script](https://github.com/torvalds/linux/blob/v4.14/Documentation/kbuild/makefiles.txt#L1229), but we are not very interested in it.
+  このターゲットは、すでにおなじみの`if_changed`関数を使用しています。
+  前提条件のいずれかが更新されると`cmd_link-vmlinux`コマンドが実行されます。
+  このコマンドは[scripts/link-vmlinux.sh](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh)
+  スクリプトを実行します（`cmd_link-vmlinux`コマンドで自動変数 [$<](https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html)
+  が使用されていることに注意してください）。また、アーキテクチャ固有の
+  [postlink script](https://github.com/torvalds/linux/blob/v4.14/Documentation/kbuild/makefiles.txt#L1229)
+  スクリプトも実行されますが、ここではあまり興味がありません。
 
-* When [scripts/link-vmlinux.sh](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh) is executed it assumes that all required object files are already built and their locations are stored in 3 variables: `KBUILD_VMLINUX_INIT`, `KBUILD_VMLINUX_MAIN`, `KBUILD_VMLINUX_LIBS`.
+* [scripts/link-vmlinux.sh](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh)が実行される際、必要なすべてのオブジェクトファイルは
+既にビルドされており、そのロケーションが3つの変数、`KBUILD_VMLINUX_INIT`,
+`KBUILD_VMLINUX_MAIN`, `KBUILD_VMLINUX_LIBS`に格納されていると仮定されています。
 
-* `link-vmlinux.sh` script first creates `thin archive` from all available object files. `thin archive` is a special object that contains references to a set of object files as well as their combined symbol table. This is done inside [archive_builtin](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L56) function. In order to create `thin archive` this function uses [ar](https://sourceware.org/binutils/docs/binutils/ar.html) utility. Generated `thin archive` is stored as `built-in.o` file and has the format that is understandable by the linker, so it can be used as any other normal object file.
+* `link-vmlinux.sh`スクリプトはまず、利用可能なすべてのオブジェクトファイル
+から`thin archive`を作成します。`thin archive`はオブジェクトファイルセット
+だけでなく、その合成されたシンボルテーブルも含んでいる特別なオブジェクトです。
+これは[archive_builtin](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L56)
+関数で行われます。この関数は`thin archive`を作成するために[ar](https://sourceware.org/binutils/docs/binutils/ar.html)
+ユーティリティを使用します。生成されたthin archive`は`built-in.o`ファイルに
+格納され、リンカが理解可能なフォーマットになっています。そのため、その他の
+普通のオブジェクトファイルのように使用することができます。
 
-* Next [modpost_link](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L69) is called. This function calls linker and generates `vmlinux.o` object file. We need this object file to perform [Section mismatch analysis](https://github.com/torvalds/linux/blob/v4.14/lib/Kconfig.debug#L308). This analysis is performed by the [modpost](https://github.com/torvalds/linux/tree/v4.14/scripts/mod) program and is triggered at [this](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L260) line.
+* 次に、[modpost_link](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L69)を呼び出します。この関数はリンカを呼び出して`vmlinux.o`
+オブジェクトファイルを生成します。このオブジェクトファイルは[セクションミスマッチ解析](https://github.com/torvalds/linux/blob/v4.14/lib/Kconfig.debug#L308)
+の実行に必要です。この解析は[modpost](https://github.com/torvalds/linux/tree/v4.14/scripts/mod)
+プログラムにより行われ、[`link-vmlinux.sh#L260`](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L260)行によりトリガされます。
 
-* Next kernel symbol table is generated. It contains information about all functions and global variables as well as their location in the `vmlinux` binary. The main work is done inside [kallsyms](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L146) function. This function first uses [nm](https://sourceware.org/binutils/docs/binutils/nm.html) to extract all symbols from `vmlinux` binary. Then it uses [scripts/kallsyms](https://github.com/torvalds/linux/blob/v4.14/scripts/kallsyms.c)  utility to generate a special assembler file containing all symbols in a special format, understandable by the Linux kernel. Next, this assembler file is compiled and linked together with the original binary.  This process is repeated several times because after the final link addresses of some symbols can be changed.  Information from the kernel symbol table is used to generate '/proc/kallsyms' file at runtime.
+* 次に、カーネルシンボルテーブルが生成されます。このファイルにはすべての関数と
+グローバル変数に関する情報とその`vmlinux`バイナリ内のロケーションが含まれて
+います。主な作業は[kallsyms](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh#L146)
+関数で行われます。この関数は、まず[nm](https://sourceware.org/binutils/docs/binutils/nm.html)を
+使用して`vmlinux`バイナリからすべてのシンボルを抽出します。そして、[scripts/kallsyms](https://github.com/torvalds/linux/blob/v4.14/scripts/kallsyms.c)
+ユーティリティを使用して、Linuxカーネルが理解できる特別なフォーマットで
+すべてのシンボルを含む特別なアセンブラファイルを生成します。次に、この
+アセンブラファイルをコンパイルし、元のバイナリとリンクします。このプロセスは
+数回繰り返されます。最終的なリンク後にシンボルのアドレスが変更されることが
+あるからです。カーネルシンボルテーブルの情報は実行時に'/proc/kallsyms'
+ファイルを生成する際に使用されます。
 
-* Finally `vmlinux` binary is ready and `System.map`  is build. `System.map` contains the same information as `/proc/kallsyms` but this is static file and unlike `/proc/kallsyms` it is not generated at runtime. `System.map` is mostly used to resolve addresses to symbol names during [kernel oops](https://en.wikipedia.org/wiki/Linux_kernel_oops). The same `nm` utility is used to build `System.map`. This is done [here](https://github.com/torvalds/linux/blob/v4.14/scripts/mksysmap#L44).
+* 最後に、`vmlinux`バイナリが完成し、`System.map`が作成されます。
+`System.map`には`/proc/kallsyms`と同じ情報が含まれていますが、これは静的な
+ファイルであり、`/proc/kallsyms`とは異なり、実行時には生成されません。
+`System.map`は主に[kernel oops](https://en.wikipedia.org/wiki/Linux_kernel_oops)
+でアドレスをシンボル名に解決するために使用されます。`System.map`の作成には
+同じ`nm`ユーティリティが使用されます。これは[`mksysmap#L44`](https://github.com/torvalds/linux/blob/v4.14/scripts/mksysmap#L44)で行われています。
 
-#### Build stage
+#### ビルドステージ
 
-* Now let's take one step backward and examine how source code files are compiled into object files. As you might remember one of the prerequisites of the `vmlinux` target is `$(vmlinux-deps)` variable. Let me now copy a few relevant lines from the main Linux makefile to demonstrate how this variable is built.
+* ここで一歩戻って、ソースコードファイルがどのようにオブジェクトファイルに
+コンパイルされるかを見てみましょう。覚えていると思いますが`vmlinux`ターゲットの
+前提条件のひとつに`$(vmlinux-deps)`変数があります。この変数がどのように
+作られるかを示すために、Linuxの主たるmakefileから関連する数行を取り出しました。
 
   ```
   init-y        := init/
@@ -163,9 +199,15 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN) $(KBUILD_VMLINUX_LIBS)
   ```
 
-  It all starts with variables like `init-y`, `core-y`, etc., which combined contains all subfolders of the Linux kernel that contains buildable source code. Then `built-in.o` is appended to all the subfolder names, so, for example, `drivers/` becomes `drivers/built-in.o`. `vmlinux-deps` then just aggregates all resulting values. This explains how `vmlinux` eventually becomes dependent on all `built-in.o` files.
+  それはすべて`init-y`、`core-y`などの変数から始まります。これらの組み合わせは
+  ビルド可能なソースコードを含むLinuxカーネルのすべてのサブフォルダを含んで
+  います。次に、すべてのサブフォルダ名に`built-in.o`が追加され、たとえば、
+  `drivers/`は`drivers/built-in.o`になります。`vmlinux-deps`は結果として
+  得られたすべての値を集約します。これで`vmlinux`が最終的にすべての
+  `built-in.o`ファイルに依存するようになることが説明できます。
 
-* Next question is how all `built-in.o` objects are created? Once again, let me copy all relevant lines and explain how it all works.
+* 次の疑問は、すべての`builtin.o`オブジェクトがどのように作られるかです。
+もう一度、関連するすべての行をコピーして、すべての仕組みを説明しましょう。
 
   ```
   $(sort $(vmlinux-deps)): $(vmlinux-dirs) ;
@@ -181,24 +223,43 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
 
   ```
 
-  The first line tells us that `vmlinux-deps` depends on `vmlinux-dirs`. Next, we can see that `vmlinux-dirs` is a variable that contains all direct root subfolders without `/` character at the end. And the most important line here is the recipe to build `$(vmlinux-dirs)` target. After substitution of all variables, this recipe will look like the following (we use `drivers` folder as an example, but this rule will be executed for all root subfolders)
+  最初の行から`vmlinux-deps`は`vmlinux-dirs@に依存していることがわかります。
+  次に、`vmlinux-dirs`は最後に`/`文字がない、すべてのダイレクトルート
+  サブフォルダを含む変数であることがわかります。そして、ここで最も重要な行は
+  `$(vmlinux-dirs)`ターゲットを構築するためのレシピです。すべての変数を
+  置換した後にこのレシピは次のようになります（例として`driver`フォルダを
+  使用していますが、このルールはすべてのルートサブフォルダに対して実行
+  されます）。
 
   ```
   make -f scripts/Makefile.build obj=drivers
   ```
 
-  This line just calls another makefile  ([scripts/Makefile.build](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build)) and passes `obj` variable, which contains a folder to be compiled.
+  この行は別のmakefile（[scripts/Makefile.build](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build)）を
+  呼び出して、コンパイルするフォルダを含む`obj`変数を渡しているだけです。
 
-* Next logical step is to take a look at [scripts/Makefile.build](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build). The first important thing that happens after it is executed is that all variables from `Makefile` or `Kbuild` files, defined in the current directory, are included. By current directory I mean the directory referenced by the `obj` variable. The inclusion is done in the [following 3 lines](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L43-L45).
+* 次の論理的ステップは[scripts/Makefile.build](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build)を見てみましょう。これの実行後に起きる
+最初に重要なことは、カレントディレクトリで定義されている`Makefile`または
+`Kbuild`ファイルのすべての変数が含まれることです。カレントディレクトリとは
+`obj`変数により参照されるディレクトリを意味します。この包摂は[`Makefile.build#L43-L45`の三行](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L43-L45)で行われています。
 
   ```
   kbuild-dir := $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))
   kbuild-file := $(if $(wildcard $(kbuild-dir)/Kbuild),$(kbuild-dir)/Kbuild,$(kbuild-dir)/Makefile)
   include $(kbuild-file)
   ```
-  Nested makefiles are mostly responsible for initializing variables like `obj-y`. As a quick reminder: `obj-y` variable should contain list of all source code files, located in the current directory. Another important variable that is initialized by the nested makefiles is `subdir-y`. This variable contains a list of all subfolders that need to be visited before the source code in the curent directory can be built. `subdir-y` is used to implement recursive descending into subfolders.
 
-* When `make` is called without specifying the target (as it is in the case when `scripts/Makefile.build` is executed) it uses the first target. The first target for `scripts/Makefile.build` is called `__build` and it can be found [here](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L96) Let's take a look at it.
+  ネストされた`makefile`はほとんどが`obj-y`のような変数の初期化を担当します。
+  簡単に思い出すと、`obj-y`変数にはカレントディレクトリにあるすべてのソース
+  コードファイルのリストが入っているはずです。入れ子のmakefileで初期化される
+  もう  一つ重要な変数は`subdir-y`です。この変数にはカレントディレクトリにある
+  ソースコードをビルドする前に訪れる必要のあるすべてのサブフォルダのリストが
+  含まれています。`subdir-y`はサブフォルダへの再帰的な降下を実装するために
+  使用されます。
+
+* ターゲットを指定せずに`make`が呼び出された場合（`scripts/Makefile.build`が
+実行された場合がそうです）は最初のターゲットが使用されます。`scripts/Makefile.build`の最初のターゲットは`__build`と呼ばれ、[`Makefile.build#L96`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L96)に
+あります。それでは見てみましょう。
 
   ```
   __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
@@ -207,20 +268,30 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
       @:
   ```
 
-  As you can see `__build` target doesn't have a receipt, but it depends on a bunch of other targets. We are only interested in `$(builtin-target)` - it is responsible for creating `built-in.o` file, and `$(subdir-ym)` - it is responsible for descending into nested directories.
+  ご覧のように `__build`ターゲットはレシピを持っていませんが、他の多くの
+  ターゲットに依存しています。ここで興味のあるのは、`built-in.o`ファイルの
+  作成を担当する`$(builtin-target)`とネストしたディレクトリへの降下を担当
+  する`$(subdir-ym)` だけです。
 
-* Let's take a look at `subdir-ym`. This variable is initialized [here](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.lib#L48) and it is just a concatenation of `subdir-y` and `subdir-m` variables.  (`subdir-m` variable is similar to `subdir-y`, but it defines subfolders need to be included in a separate [kernel module](https://en.wikipedia.org/wiki/Loadable_kernel_module). We skip the discussion of modules, for now, to keep focused.)
+* `subdir-ym`を見てみましょう。この変数は[`Makefile.lib#L48`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.lib#L48)で
+初期化されており、変数`subdir-y`と`subdir-m`を連結しただけです（`subdir-m`
+変数は`subdir-y`と似ていますが、個別の[カーネルモジュール](https://en.wikipedia.org/wiki/Loadable_kernel_module)に含まれる必要のあるサブフォルダを定義します。
+今のところ、集中力を保つためにモジュールの議論は省略します）。
 
-*  `subdir-ym` target is defined [here](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L572) and should look familiar to you.
+*  `subdir-ym`ターゲットは[`Makefile.build#L572`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L572)で
+定義されており、既におなじみでしょう。
 
   ```
   $(subdir-ym):
       $(Q)$(MAKE) $(build)=$@
   ```
 
-  This target just triggers execution of the `scripts/Makefile.build` in one of the nested subfolders.
+  このターゲットはネストされたサブフォルダの一つにある`scripts/Makefile.build`
+  の実行をトリガーするだけです。
 
-* Now it is time to examine the [builtin-target](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L467) target. Once again I am copying only relevant lines here.
+* ようやく[builtin-target](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L467)
+ターゲットを検証する時になりました。もう一度言いますが、ここでは関連する行
+だけをコピーしています。
 
   ```
   cmd_make_builtin = rm -f $@; $(AR) rcSTP$(KBUILD_ARFLAGS)
@@ -235,9 +306,20 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
       $(call if_changed,link_o_target)
   ```
 
-  This target depends on `$(obj-y)` target and `obj-y` is a list of all object files that need to be built in the current folder. After those files become ready `cmd_link_o_target` command is executed. In case if `obj-y` variable is empty `cmd_make_empty_builtin` is called, which just creates an empty `built-in.o`. Otherwise, `cmd_make_builtin` command is executed; it uses familiar to us `ar` tool to create `built-in.o` thin archive.
+  このターゲットは`$(obj-y)`ターゲットに依存しており、`obj-y`は現在の
+  カレントフォルダでビルドする必要のあるすべてのオブジェクトファイルのリスト
+  です。そのようなファイルの準備ができたら`cmd_link_o_target`コマンドが実行
+  されます。`obj-y`変数が空の場合は`cmd_make_empty_builtin`が呼び出され、
+  空の`built-in.o`が作成されます。そうでない場合は`cmd_make_builtin`コマンドが
+  実行され、おなじみの`ar`ツールを使用してthin_archive `built-in.o`が作成
+  されます。
 
-* Finally we got to the point where we need to compile something. You remember that our last unexplored dependency is `$(obj-y)` and `obj-y` is just a list of object files. The target that compiles all object files from corresponding `.c` files is defined [here](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L313). Let's examine all lines, needed to understand this target.
+* ついに何かをコンパイルしなければならないところまで来ました。思い出して
+ください。まだ調べていない最後の依存関係は`$(obj-y)`です。`obj-y`は、単なる
+オブジェクトファイルのリストです。すべてのオブジェクトファイルを対応する
+`.c`ファイルからコンパイルするターゲットは[`Makefile.build#L313`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L313)で
+定義されています。このターゲットを理解するために必要なすべての行を調べて
+みましょう。
 
   ```
   cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
@@ -255,23 +337,36 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
       $(call if_changed_rule,cc_o_c)
   ```
 
-  Inside it's recipe this target calls `rule_cc_o_c`. This rule is responsible for a lot of things, like checking the source code for some common errors (`cmd_checksrc`), enabling versioning for exported module symbols (`cmd_modversions_c`), using [objtool](https://github.com/torvalds/linux/tree/v4.14/tools/objtool) to validate some aspects of generated object files and constructing a list of calls to `mcount` function so that [ftrace](https://github.com/torvalds/linux/blob/v4.14/Documentation/trace/ftrace.txt) can find them quickly. But most importantly it calls `cmd_cc_o_c` command that actually compiles all `.c` files to object files.
+  このターゲットはそのレシピで`rule_cc_o_c`を呼び出します。このルールは
+  たくさんのことを担当します。たとえば、一般的なエラーがないかソースコードを
+  チェック (`cmd_checksrc`)、エクスポートされたモジュールシンボルの
+  バージョニングの有効化 (`cmd_modversions_c`)、[objtool](https://github.com/torvalds/linux/tree/v4.14/tools/objtool)を使用した生成されたオブジェクト
+  ファイルの検証、[ftrace](https://github.com/torvalds/linux/blob/v4.14/Documentation/trace/ftrace.txt)の迅速な検索を可能にする`mcount`関数の
+  呼び出しリストの作成などです。しかし、最も重要なのは実際にすべての
+  `.c`ファイルをオブジェクトファイルにコンパイルする`cmd_cc_o_c`コマンドの
+  呼び出しです。
 
-### Conclusion
+### 結論
 
-Wow, it was a long journey inside kernel build system internals! Still, we skipped a lot of details and, for those who want to learn more about the subject, I can recommend to read the following [document](https://github.com/torvalds/linux/blob/v4.14/Documentation/kbuild/makefiles.txt) and continue reading Makefiles source code. Let me now emphasize the important points, that you should take as a take-home message from this chapter.
+カーネルビルドシステムの内部についての長い旅でした。それでも多くの詳細を
+省略しました。この主題についてもっと詳しく知りたい方は、[このドキュメント](https://github.com/torvalds/linux/blob/v4.14/Documentation/kbuild/makefiles.txt)を
+読み、Makefilesのソースコードを読み続けることをお勧めします。ここでは
+この章で覚えておいてほしい重要な点を強調しておきます。
 
-1. How `.c` files are compiled into object files.
-1. How object files are combined into `built-in.o` files.
-1. How  recursive build pick up all child `built-in.o` files and combines them into a single one.
-1. How `vmlinux` is linked from all top-level `built-in.o` files.
+1. `.c`ファイルはどのようにオブジェクトファイルにコンパイルされるか。
+2. オブジェクトファイルはどのように`built-in.o`ファイルにまとめられるか。
+3. 再帰的ビルドはどのようにすべての子`builtin.o`ファイルを選び出し、1つの
+ファイルにまとめるか。
+4. `vmlinux`はどのようにすべてのトップレベル`builtin.o`ファイルからリンク
+されるか。
 
-My main goal was that after reading this chapter you will gain a general understanding of all above points.
+私の主な目標は、この章を読んだ後に上記のすべてについて一般的な理解を
+得られるようにすることでした。
 
-##### Previous Page
+##### 前ページ
 
-1.2 [Kernel Initialization: Linux project structure](../../../docs/lesson01/linux/project-structure.md)
+1.2 [カーネルの初期化: Linuxプロジェクトの構造](../../../docs/lesson01/linux/project-structure.md)
 
-##### Next Page
+##### 次ページ
 
-1.4 [Kernel Initialization: Linux startup sequence](../../../docs/lesson01/linux/kernel-startup.md)
+1.4 [カーネルの初期化: Linux起動シーケンス](../../../docs/lesson01/linux/kernel-startup.md)
