@@ -46,7 +46,7 @@ OS開発のスキルは必要ありません。
   * Linux
     * 1.2 [Linuxプロジェクトの構成](docs/lesson01/linux/project-structure.md)
     * 1.3 [カーネルビルドシステム](docs/lesson01/linux/build-system.md)
-    * 1.4 [Startup sequence](docs/lesson01/linux/kernel-startup.md)
+    * 1.4 [起動シーケンス](docs/lesson01/linux/kernel-startup.md)
   * 1.5 [演習](docs/lesson01/exercises.md)
 * **Lesson 2: プロセッサの初期化**
   * 2.1 [RPi OS](docs/lesson02/rpi-os.md)

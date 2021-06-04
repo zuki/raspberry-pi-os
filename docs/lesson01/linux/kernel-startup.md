@@ -1,71 +1,181 @@
-## 1.4: Linux startup sequence
+## 1.4: Linux起動シーケンス
 
-### Searching for the entry point
+### エントリポイントを探す
 
-After taking a look at the Linux project structure and examining how it can be built, next logical step is to find the program entry point. This step might be trivial for a lot of programs, but not for the Linux kernel. 
+Linuxプロジェクトの構造を確認し、どのようにビルドされるかを検討したので、
+次の論理的なステップは、プログラムのエントリポイントを見つけることです。
+このステップは多くのプログラムにとっては些細なことかもしれませんが、
+Linuxカーネルにとってはそうではありません。
 
-The first thing we are going to do is to take a look at [arm64 linker script](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/vmlinux.lds.S). We have already seen how the linker script [is used in the main makefile](https://github.com/torvalds/linux/blob/v4.14/Makefile#L970). From this line, we can easily infer, where the linker script for a particular architecture can be found.
+まず最初に私たちがすることは[arm64リンカスクリプト](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/vmlinux.lds.S)を
+見ることです。リンカスクリプトが主たるmakefileでそのように使われているかは
+すでに見たとおりです。[この行](https://github.com/torvalds/linux/blob/v4.14/Makefile#L970)から特定のアーキテクチャ用のリンカスクリプトがどこに
+あるかを簡単に推測することができます。
 
-It should be mentioned that the file we are going to examine is not an actual linker script - it is a template, from which the actual linker script is built by substituting some macros with their actual values. But precisely because this file consists mostly of macros it becomes much easier to read and to port between different architectures.
+これから調べるファイルは実際のリンカスクリプトではないということをここで
+述べておく必要があります。これはいくつかのマクロを実際の値に置き換えて
+実際のリンカスクリプトを作るためのテンプレートです。しかし、正確には
+このファイルはほとんどがマクロで構成されているため、非常に読みやすく、
+異なるアーキテクチャへの移植も容易です。
 
-The first section that we can find in the linker script is called [.head.text](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/vmlinux.lds.S#L96). This is very important for us because the entry point should be defined in this section. If you think a little about it, it makes a perfect sense: after the kernel is loaded, the content of the binary image is copied into some memory area and execution is started from the beginning of that area. This means that just by searching who is using `.head.text` section we should be able to find the entry point. And indeed, `arm64` architecture has a single file that uses [__HEAD](https://github.com/torvalds/linux/blob/v4.14/include/linux/init.h#L90) macro, which is expanded to `.section    ".head.text","ax"` - this file is [head.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S).
+リンカスクリプトの最初のセクションは[.head.text](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/vmlinux.lds.S#L96)と
+呼ばれます。これは私たちにとって非常に重要です。エントリポイントはこの
+セクションで定義されているからです。少し考えてみればそれは非常に理にかなって
+います。カーネルがロードされた後、バイナリイメージの内容はあるメモリ領域に
+コピーされ、その領域の先頭から実行が開始されるからです。これは`.head.text`
+セクションを使ってものを検索すれば、エントリポイントを見つけることができる
+ことを意味します。そして実際、`arm64`アーキテクチャには`.section    ".head.text","ax"`に展開される[__HEAD](https://github.com/torvalds/linux/blob/v4.14/include/linux/init.h#L90)
+マクロを使っているファイルが1つあります。[head.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S)です。
 
-The first executable line, that we can find in `head.S` file is [this one](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L85). Here we use arm assembler `b` of `branch` instruction to jump to the [stext](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L116) function. And this is the first function that is executed after you boot the kernel.
+`head.S`ファイルにある最初の実行可能な行が[`head.S#L85`](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L85)です。
+ここでは、armアセンブラの`b`（`branch`）命令を使って[stext](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L116)
+関数にジャンプしています。そして、これがカーネル起動後に実行される
+最初の関数です。
 
-Next logical step is to explore what is going on inside the `stext` function - but we are not ready yet. First, we have to implement similar functionality in the RPi OS, and that is something we will cover in the next few lessons. What we are going to do right now is to examine a few critical concepts, related to kernel boot.
+次の論理的ステップは`stext`関数の内部で何が行われているかを調べることですが、
+それにはまだ準備ができていません。まず、同様の機能をRPi OSに実装する必要が
+ありますが、これは次の数回のレッスンで取り上げるものです。今やるべきことは
+カーネルブートに関連するいくつかの重要なコンセプトを調べることです。
 
-### Linux bootloader and boot protocol
+### Linuxのブートローダとブートプロトコル
 
-When linux kernel boots it assumes that the machine hardware is prepared in some "known state". The set of rules that defines this state is called "boot protocol", and for `arm64` architecture it is documented [here](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt). Among other things, it defines, for example, that the execution must start only on primary CPU, Memory Mapping Unit must be turned off and all interrupts must be disabled. 
+Linuxカーネルの起動時には、マシンのハードウェアが何らかの「既知の状態」に
+なっていることを前提としています。この状態を定義する一連のルールは「ブート
+プロトコル」と呼ばれており、`arm64`アーキテクチャの場合は[この文書](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt)に
+記載されています。たとえば、実行はプライマリCPUでのみ開始すること、
+メモリマッピングユニット（MMU）はオフになっていること、すべての割り込みは
+無効になっていることなどが定義されています。
 
-Ok, but who is responsible for bringing a machine into that known state? Usually, there is a special program that runs before the kernel and performs all initializations. This program is called `bootloader`. Bootloader code may be very machine specific, and this is the case, with Raspberry PI. Raspberry PI has a bootloader that is is built into the board. We can only use [config.txt](https://www.raspberrypi.org/documentation/configuration/config-txt/) file to customize its behavior. 
+では、マシンをそのような状態にする責任は誰にあるのでしょうか？通常、
+カーネルの前に実行され、すべての初期化を行う特別なプログラムがあります。
+このプログラムは「ブートローダ」と呼ばれます。ブートローダのコードは
+マシン固有の場合が多いですが、Raspberry PIの場合も同様です。Raspberry PI
+にはボードに内蔵されているブートローダがあります。その動作をカスタマイズ
+するには[config.txt](https://www.raspberrypi.org/documentation/configuration/config-txt/)を使うしかありません。
 
-### UEFI boot
+### UEFIブート
 
-However, there is one boot loader that can be built into the kernel image itself. This bootloader can be used only on the platforms that support [Unified Extensible Firmware Interface (UEFI)](https://en.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface). Devices that support UEFI provide a set of standardized services to the running software and those services can be used to figure out all necessary information about the machine itself and its capabilities. UEFI also requires that computer firmware should be capable of running executable files in [Portable Executable (PE)](https://en.wikipedia.org/wiki/Portable_Executable) format. Linux kernel UEFI bootloader makes use of this feature: it injects `PE` header at the beginning of the Linux kernel image so that computer firmware think that the image is a normal `PE` file. This is done in [efi-header.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-header.S) file. This file defines [__EFI_PE_HEADER](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-header.S#L13) macro, which is used inside [head.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L98).
+しかし、カーネルイメージ自体に組み込むことができるブートローダが1つあります。
+このブートローダは[UEFI (Unified Extensible Firmware Interface)](https://en.wikipedia.org/wiki/Unified_Extensible_Firmware_Interface)を
+サポートしているプラットフォームでしか使用できません。UEFIをサポートする
+デバイスは、実行中のソフトウェアに一連の標準化されたサービスを提供し、
+それらのサービスをマシン自体とその機能に関するすべての必要な情報を把握する
+ために使用することができます。また、UEFIはコンピュータのファームウェアが
+[PE (Portable Executable)](https://en.wikipedia.org/wiki/Portable_Executable)
+フォーマットの実行ファイルを実行できることを要求しています。Linuxカーネルの
+UEFIブートローダはこの機能を利用しています。このローダは、コンピュータの
+ファームウェアがイメージを通常の`PE`ファイルだと認識するようにLinuxカーネル
+イメージの先頭に`PE`ヘッダを挿入します。これは[efi-header.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-header.S)
+ファイルで行われています。このファイルには[__EFI_PE_HEADER](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-header.S#L13)
+マクロが定義されており、[head.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L98)で使用されています。
 
-One important property that is defined inside `__EFI_PE_HEADER` is the one that tells about the [location of the UEFI entry point](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-header.S#L33) and the entry point itself can be found in [efi-entry.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-entry.S#L32). Starting from this location, you can follow the source code and examine what exactly UEFI bootloader is doing (the source code itself is more or less straightforward). But we are going to stop here because the purpose of this section is not to examine UEFI bootloader in details, but instead, give you a general idea what UEFI is and how Linux kernel uses it.
+`__EFI_PE_HEADER`で定義されている重要なプロパティの一つは[UEFIエントリポイントのロケーション](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-header.S#L33)を
+示すものであり、エントリーポイント自体は [efi-entry.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/efi-entry.S#L32)に
+あります。このロケーションからソースコードをたどることでUEFIブートローダが
+何をしているのかを正確に調べることができます (ソースコード自体は多かれ少なかれ
+簡単です)。しかし、このセクションの目的はUEFIブートローダを詳しく調べること
+ではなく、UEFIが何であるか、Linuxカーネルがそれをどのように使用しているかに
+ついての一般的なアイデアを与えることなので、ここで止めておきます。
 
-### Device Tree
+### デバイスツリー
 
-When I started to examine the startup code of the Linux kernel, I found a lot of mentions of `Device Trees`. It appears to be an essential concept, and I consider it necessary to discuss it.
+Linuxカーネルの起動コードを調べ始めると「デバイスツリー」に言及している記述を
+数多く見ました。これは必須の概念のようです。私はこれについて議論する必要が
+あると考えます。
 
-When we were working on `Raspberry PI OS` kernel, we used [BCM2837 ARM Peripherals manual](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf) to figure out what is the exact offset at which a particular memory mapped register is located. This information obviously is different for each board, and we are lucky that we have to support only one of them. But what if we need to support hundreds of different boards? It would be a total mess if we try to hardcode information about each board in the kernel code. And even if we manage to do so, how would we figure out what board we are using right now? `BCM2837`, for example, doesn't provide any means of communicating such information to the running kernel.
+`Raspberry PI OS`のカーネルを作成していた際、[BCM2837 ARM Peripherals manual](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf)を
+参考にして、特定のメモリマップドレジスタの正確なオフセットを調べました。
+この情報は明らかにボードごとに異なるので、サポートしなければならないのは
+そのうちの1つだけなのは幸運でした。しかし、何百ものボードをサポートしなければ
+ならないとしたらどうでしょう。各ボードの情報をカーネルコードにハード
+コーディングしようとすればまったくの混乱に陥るでしょう。仮にそれができたと
+しても、今使っているボードが何であるかをどうやって知ることができるでしょうか。
+たとえば、`BCM2837`はそのような情報を実行中のカーネルに伝える手段を提供
+していません。
 
-Device tree provides us with the solution to the problem, mentioned above. It is a special format that can be used to describe computer hardware. Device tree specification can be found [here](https://www.devicetree.org/). Before the kernel is executed, bootloader selects proper device tree file and passes it as an argument to the kernel. If you take a look at the files in the boot partition on a Raspberry PI SD card, you can find a lot of `.dtb` files here. `.dtb` are compiled device tree files. You can select some of them in the `config.txt` to enable or disable some Raspberry PI  hardware. This process is described in more details in the [Raspberry PI official documentation](https://www.raspberrypi.org/documentation/configuration/device-tree.md).
+この問題を解決するのが上で述べたデバイスツリーです。デバイスツリーとは
+コンピュータのハードウェアを記述するための特別なフォーマットです。
+デバイスツリーの仕様は[こちら](https://www.devicetree.org/)を
+ご覧ください。カーネルが実行される前に、ブートローダは適切なデバイスツリー
+ファイルを選択し、カーネルに引数として渡します。Raspberry PI SDカードの
+ブートパーティションにあるファイルを見るとたくさんの`.dtb`ファイルが
+あります。`.dtb`はコンパイル済みのデバイスツリーファイルです。
+`config.txt`でそれらの一部を選択することによりRaspberry PIのハードウェアを
+有効にしたり無効にしたりすることができます。このプロセスについては
+[Raspberry PIの公式ドキュメント](https://www.raspberrypi.org/documentation/configuration/device-tree.md)に詳しく説明されています。
 
-Ok, now it is time to take a look at how an actual device tree looks like. As a quick exercise, let's try to find a device tree for [Raspberry PI 3 Model B](https://www.raspberrypi.org/products/raspberry-pi-3-model-b/). From the [documentation](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2837/README.md) we can figure out that `Raspberry PI 3 Model B` uses a chip that is called `BCM2837`. If you search for this name you can find [/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts)  file. As you might see it just includes the same file from `arm` architecture. This makes a perfect sense because `ARM.v8` processor supports 32-bit mode as well.
+では、実際のデバイスツリーがどのようになっているかを見てみましょう。
+簡単な練習として、[Raspberry PI 3 Model B](https://www.raspberrypi.org/products/raspberry-pi-3-model-b/)用の
+デバイスツリーを見つけましょう。[ドキュメント](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2837/README.md)から、`Raspberry PI 3 Model B`は`BCM2837`というチップを使用していることがわかります。この名前で
+検索すると[/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts)
+ファイルが見つかります。ご覧のように、このファイルには`arm`アーキテクチャの
+と同じファイルが含まれているだけです。`ARM.v8`プロセッサは32ビットモードも
+サポートしているので、これは完全に理にかなっています。
 
-Next, we can find [bcm2837-rpi-3-b.dts](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts) belonging to the [arm](https://github.com/torvalds/linux/tree/v4.14/arch/arm) architecture. We already saw that device tree files could include on another. This is the case with the  `bcm2837-rpi-3-b.dts` - it only contains those definitions, that are specific for `BCM2837` and reuses everything else. For example,  `bcm2837-rpi-3-b.dts` specifies that [the device now have 1GB of memory](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts#L18). 
+次に、[bcm2837-rpi-3-b.dts](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts)は
+[arm](https://github.com/torvalds/linux/tree/v4.14/arch/arm)アーキテクチャーに
+属していることがわかります。デバイスツリーが別のデバイスツリーを含んでいる
+場合があることは既に見ました。`bcm2837-rpi-3-b.dts`がそうでした。この
+ファイルは`BCM2837`固有の定義だけを含んでおり、それ以外はすべて再利用して
+います。たとえば、`bcm2837-rpi-3-b.dts`では[デバイスが1GBのメモリを搭載している](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts#L18)ことを明記しています。
 
-As I mentioned previously, `BCM2837` and `BCM2835` have an identical peripheral hardware, and, if you follow the chain of includes, you can find [bcm283x.dtsi](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi) that actually defines most of this hardware. 
+先に述べたように、`BCM2837`と`BCM2835`の周辺ハードウェアは同じなので、
+インクルードの連鎖をたどることにより、実際にこのハードウェアのほとんどを
+定義している[bcm283x.dtsi](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi)を
+見つけることができます。
 
-A device tree definition consists of the blocks nested one in another. At the top level we usually can find such blocks as [cpus](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L30) or [memory](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts#L17) The meaning of those blocks should be quite self-explanatory. Another interesting top-level element that we can find in the `bcm283x.dtsi` is [SoC](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L52) that means [System on a chip](https://en.wikipedia.org/wiki/System_on_a_chip) It tells us that all peripheral devices are directly mapped to some memory area via memory mapped registers. `soc` element serves as a parent element for all peripheral devices. One of its children is [gpio](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L147) element. This element defines [reg = <0x7e200000 0xb4>](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L149) property that tells us that GPIO memory mapped registers are located in the  `[0x7e200000 : 0x7e2000b4]` region. One of the childern of `gpio` element has the [following definition](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L474)
+デバイスツリーの定義はブロックの入れ子構造で構成されています。トップ
+レベルには通常、[cpus](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L30)や
+[memory](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts#L17)などのブロックがあります。これらのブロックの意味は
+非常にわかりやすいと思います。`bcm283x.dtsi`で見られるもう一つの興味深い
+トップレベル要素は[SoC](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L52)です。
+これは[System on a chip](https://en.wikipedia.org/wiki/System_on_a_chip)を意味します。
+これはすべてのペリフェラルデバイスはメモリマップドレジスタを介して直接
+何らかのメモリ領域にマッピングされていることを示しています。`soc`要素は
+すべてのペリフェラルデバイスの親要素を提供しています。その子要素の一つが
+[gpio](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L147)要素です。
+この要素は[reg = <0x7e200000 0xb4>](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L149)というプロパティを定義しており、
+GPIOのメモリマップドレジスタが`[0x7e200000 : 0x7e2000b4]`の領域にあることを
+示しています。`gpio`要素の子要素の一つに[次の定義](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L474)があります。
 
 ```
 uart1_gpio14: uart1_gpio14 {
         brcm,pins = <14 15>;
         brcm,function = <BCM2835_FSEL_ALT5>;
 };
-``` 
-This definition tells us that if alternative function 5 is selected for pins 14 and 15 those pins will be connection to `uart1` device. You can easily gues that `uart1` device is the Mini UART that we have used already.
+```
 
-One important thing that you need to know about device trees is that the format is extendable. Each device can define its own properties and nested blocks. Those properties are transparently passed to the device driver, and it is driver responsibility to interpret them. But how can the kernel figure out the correspondence between a block in a device tree and the right driver? It uses `compatible` property to do this. For example, for `uart1` device `compatible` property is specified like this
+この定義は、ピン 14と15に代替機能 5が選択された場合、これらのピンが`uart1`
+デバイスに接続されることを示しています。`uart1`デバイスはこれまでに使用
+してきたMini UARTであることは容易に推測できます。
+
+デバイスツリーについて知っておくべき重要なことは、そのフォーマットは拡張
+可能であることです。各デバイスは独自のプロパティやネストされたブロックを
+定義することができます。それらのプロパティはデバイスドライバに透過的に
+渡され、それを解釈するのはドライバの責任です。では、カーネルはデバイス
+ツリーのブロックと正しいドライバとの対応関係をどのように把握するので
+しょうか。カーネルは`compatible`プロパティを使ってこれを行います。
+たとえば、`uart1`デバイスの`compatible`プロパティは次のように指定されて
+います。
 
 ```
 compatible = "brcm,bcm2835-aux-uart";
 ```
 
-And indeed, if you search for `bcm2835-aux-uart` in the Linux source code, you can find a matching driver, it is defined in [8250_bcm2835aux.c](https://github.com/torvalds/linux/blob/v4.14/drivers/tty/serial/8250/8250_bcm2835aux.c)
+実際、Linuxのソースコードで`bcm2835-aux-uart`を検索すると、一致する
+ドライバが見つかります。これは[8250_bcm2835aux.c](https://github.com/torvalds/linux/blob/v4.14/drivers/tty/serial/8250/8250_bcm2835aux.c)で
+定義されています。
 
-### Conclusion
+### 結論
 
-You can think about this chapter as a preparation for reading `arm64` boot code - without understanding the concepts that we've just explored you would have a hard time learning it. In the next lesson, we will go back to the `stext` function and examine in details how it works.
+本章は、`arm64`のブートコードを読むための準備と考えることができます。
+ここで説明してきた概念を理解していなければ、それを学ぶことは難しいで
+しょう。次のレッスンでは`stext`関数に戻って、その動作を詳しく調べます。
 
-##### Previous Page
+##### 前ページ
 
-1.3 [Kernel Initialization: Kernel build system](../../../docs/lesson01/linux/build-system.md)
+1.3 [カーネルの初期化: カーネルビルドシステム](../../../docs/lesson01/linux/build-system.md)
 
-##### Next Page
+##### 次ページ
 
-1.5 [Kernel Initialization: Exercises](../../../docs/lesson01/exercises.md)
+1.5 [カーネルの初期化: 演習](../../../docs/lesson01/exercises.md)
