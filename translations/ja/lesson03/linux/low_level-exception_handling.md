@@ -1,61 +1,79 @@
-## 3.2: Low-level exception handling in Linux
+## 3.2: Linuxにおける低レベル例外処理
 
-Given huge Linux kernel source code, what is a good way to find the code that is responsible for interrupt handling? I can suggest one idea. Vector table base address should be stored in the 'vbar_el1' register, so, if you search for `vbar_el1`, you should be able to figure out where exactly the vector table is initialized. Indeed, the search gives us just a few usages, one of which belongs to already familiar to us [head.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S). This code is inside [__primary_switched](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L323) function. This function is executed after the MMU is switched on. The code looks like the following.
+巨大なLinuxカーネルのソースコードがある中で、割り込み処理を担当しているコードを
+見つける良い方法は何でしょうか。1つのアイデアを提案します。ベクタテーブルの
+ベースアドレスは'vbar_el1'レジスタに格納されるので、'vbar_el1'を検索すれば
+ベクタテーブルがどこで初期化されているのかがわかるはずです。実際、検索すると
+その使用は数箇所しかなく、その一つはすでにおなじみの[hhead.S](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S)にあります。
+このコードは[__primary_switched](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L323)
+関数にあります。この関数はMMUがスイッチオンされた後に実行されます。コードは次の
+ようになっています。
 
 ```
-    adr_l    x8, vectors            // load VBAR_EL1 with virtual
-    msr    vbar_el1, x8            // vector table address
+    adr_l  x8, vectors             // 仮想ベクタテーブルアドレスを
+    msr    vbar_el1, x8            // VBAR_EL1にロード
 ```
 
-From this code, we can infer that the vector table is called `vectors` and you should be able to easily find [its definition](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L367).
+このコードからベクタテーブルは`vectors`と呼ばれているのが推測でき、[その定義](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L367)
+を簡単に見つけることができます。
 
 ```
 /*
- * Exception vectors.
+ * 例外ベクタ
  */
     .pushsection ".entry.text", "ax"
 
     .align    11
 ENTRY(vectors)
-    kernel_ventry    el1_sync_invalid        // Synchronous EL1t
-    kernel_ventry    el1_irq_invalid            // IRQ EL1t
-    kernel_ventry    el1_fiq_invalid            // FIQ EL1t
+    kernel_ventry    el1_sync_invalid         // Synchronous EL1t
+    kernel_ventry    el1_irq_invalid          // IRQ EL1t
+    kernel_ventry    el1_fiq_invalid          // FIQ EL1t
     kernel_ventry    el1_error_invalid        // Error EL1t
 
-    kernel_ventry    el1_sync            // Synchronous EL1h
-    kernel_ventry    el1_irq                // IRQ EL1h
-    kernel_ventry    el1_fiq_invalid            // FIQ EL1h
+    kernel_ventry    el1_sync                 // Synchronous EL1h
+    kernel_ventry    el1_irq                  // IRQ EL1h
+    kernel_ventry    el1_fiq_invalid          // FIQ EL1h
     kernel_ventry    el1_error_invalid        // Error EL1h
 
-    kernel_ventry    el0_sync            // Synchronous 64-bit EL0
-    kernel_ventry    el0_irq                // IRQ 64-bit EL0
-    kernel_ventry    el0_fiq_invalid            // FIQ 64-bit EL0
+    kernel_ventry    el0_sync                 // Synchronous 64-bit EL0
+    kernel_ventry    el0_irq                  // IRQ 64-bit EL0
+    kernel_ventry    el0_fiq_invalid          // FIQ 64-bit EL0
     kernel_ventry    el0_error_invalid        // Error 64-bit EL0
 
 #ifdef CONFIG_COMPAT
-    kernel_ventry    el0_sync_compat            // Synchronous 32-bit EL0
-    kernel_ventry    el0_irq_compat            // IRQ 32-bit EL0
-    kernel_ventry    el0_fiq_invalid_compat        // FIQ 32-bit EL0
-    kernel_ventry    el0_error_invalid_compat    // Error 32-bit EL0
+    kernel_ventry    el0_sync_compat          // Synchronous 32-bit EL0
+    kernel_ventry    el0_irq_compat           // IRQ 32-bit EL0
+    kernel_ventry    el0_fiq_invalid_compat   // FIQ 32-bit EL0
+    kernel_ventry    el0_error_invalid_compat // Error 32-bit EL0
 #else
-    kernel_ventry    el0_sync_invalid        // Synchronous 32-bit EL0
-    kernel_ventry    el0_irq_invalid            // IRQ 32-bit EL0
-    kernel_ventry    el0_fiq_invalid            // FIQ 32-bit EL0
+    kernel_ventry    el0_sync_invalid         // Synchronous 32-bit EL0
+    kernel_ventry    el0_irq_invalid          // IRQ 32-bit EL0
+    kernel_ventry    el0_fiq_invalid          // FIQ 32-bit EL0
     kernel_ventry    el0_error_invalid        // Error 32-bit EL0
 #endif
 END(vectors)
 ```
 
-Looks familiar, isn't it? And indeed, I've copied most of this code and just simplified it a little bit. [kernel_ventry](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L72) macro is almost the same as [ventry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L12), defined in the RPi OS. One difference, though, is that `kernel_ventry`  also is responsible for checking whether a kernel stack overflow has occurred. This functionality is enabled if `CONFIG_VMAP_STACK` is set and it is a part of the kernel feature that is called `Virtually mapped kernel stacks`. I'm not going to explain it in details here, however, if you are interested, I can recommend you to read [this](https://lwn.net/Articles/692208/) article.
+見覚えがありませんか。実際、渡しはこのコードをコピーして少し簡単に下だけです。
+[kernel_ventry](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L72)
+マクロは、RPi OSで定義されている[ventry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L12)と
+ほぼ同じです。ただし一つだけ違います。`kernel_ventry`はカーネルのスタック
+オーバーフローの発生をチェックする役割も担っていることです。この機能は
+`CONFIG_VMAP_STACK`が設定されている場合に有効で、「仮想マップドカーネルスタック」
+と呼ばれるカーネル機能の一部です。それについてはここでは詳細を説明しませんが
+興味のある方は[この](https://lwn.net/Articles/692208/)記事を読むことを勧めます。
 
 ### kernel_entry
 
-[kernel_entry](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L120) macro should also be familiar to you. It is used exactly in the same way as the [corresonding macro](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L17) in the RPI OS. Original (Linux) version, however, is a lot more complicated. The code is listed below.
+[kernel_entry](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L120)
+マクロもお馴染みのはずです。このマクロはRPI OSの[対応するマクロ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L17)と
+まったく同じように使用されます。ただし、オリジナル（Linux）バージョンはより複雑
+です。そのコードを以下に示します。
 
 ```
 	.macro	kernel_entry, el, regsize = 64
 	.if	\regsize == 32
-	mov	w0, w0				// zero upper 32 bits of x0
+	mov	w0, w0				// x0の上位32ビットをゼロクリア
 	.endif
 	stp	x0, x1, [sp, #16 * 0]
 	stp	x2, x3, [sp, #16 * 1]
@@ -75,29 +93,29 @@ Looks familiar, isn't it? And indeed, I've copied most of this code and just sim
 
 	.if	\el == 0
 	mrs	x21, sp_el0
-	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
-	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
-	disable_step_tsk x19, x20		// exceptions when scheduling.
+	ldr_this_cpu	tsk, __entry_task, x20	// MDSCR_EL1.SSを確実にクリア
+	ldr	x19, [tsk, #TSK_TI_FLAGS]	// スケジューリングの際にデバッグ
+	disable_step_tsk x19, x20		// 例外をアンマスクできるように
 
-	mov	x29, xzr			// fp pointed to user-space
+	mov	x29, xzr			// fpがユーザ空間を指すように
 	.else
 	add	x21, sp, #S_FRAME_SIZE
 	get_thread_info tsk
-	/* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
+	/* タスクのもともとのaddr_limitを保存して、USER_DS (TASK_SIZE_64)をセット */
 	ldr	x20, [tsk, #TSK_TI_ADDR_LIMIT]
 	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
 	mov	x20, #TASK_SIZE_64
 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
-	/* No need to reset PSTATE.UAO, hardware's already set it to 0 for us */
+	/* ハードウェがすでに0にセットしているので、PSTATE.UAOのリセットは不要 */
 	.endif /* \el == 0 */
 	mrs	x22, elr_el1
 	mrs	x23, spsr_el1
 	stp	lr, x21, [sp, #S_LR]
 
 	/*
-	 * In order to be able to dump the contents of struct pt_regs at the
-	 * time the exception was taken (in case we attempt to walk the call
-	 * stack later), chain it together with the stack frames.
+	 * （後でコールスタックを辿る場合に）例外が発生した
+	 * 時点のpt_regs構造体の内容をダンプできるように、
+	 * スタックフレームも入れておく
 	 */
 	.if \el == 0
 	stp	xzr, xzr, [sp, #S_STACKFRAME]
@@ -108,23 +126,22 @@ Looks familiar, isn't it? And indeed, I've copied most of this code and just sim
 
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN
 	/*
-	 * Set the TTBR0 PAN bit in SPSR. When the exception is taken from
-	 * EL0, there is no need to check the state of TTBR0_EL1 since
-	 * accesses are always enabled.
-	 * Note that the meaning of this bit differs from the ARMv8.1 PAN
-	 * feature as all TTBR0_EL1 accesses are disabled, not just those to
-	 * user mappings.
+	 * SPSRのTTBR0 PANビットをセットする。例外がEL0で発生した場合は.
+	 * アクセスは既に有効だから、TTBR0_EL1の状態をチェックする必要はない。
+	 * このビットの意味はARMv8.1のPAN機能とは異なり、ユーザマッピングへの
+     * アクセスだけでなく、すべてのTTBR0_EL1アクセスが無効になることに
+     * 注意してください。
 	 */
 alternative_if ARM64_HAS_PAN
-	b	1f				// skip TTBR0 PAN
+	b	1f				// TTBR0 PANをスキップ
 alternative_else_nop_endif
 
 	.if	\el != 0
 	mrs	x21, ttbr0_el1
-	tst	x21, #0xffff << 48		// Check for the reserved ASID
-	orr	x23, x23, #PSR_PAN_BIT		// Set the emulated PAN in the saved SPSR
-	b.eq	1f				// TTBR0 access already disabled
-	and	x23, x23, #~PSR_PAN_BIT		// Clear the emulated PAN in the saved SPSR
+	tst	x21, #0xffff << 48		    // 予約されているASIDをチェック
+	orr	x23, x23, #PSR_PAN_BIT		// 保存したSPSRのエミュレートPANをセット
+	b.eq	1f				        // TTBR0のアクセスは既に無効になっている
+	and	x23, x23, #~PSR_PAN_BIT		// 保存したSPSRのエミュレートPANをクリア
 	.endif
 
 	__uaccess_ttbr0_disable x21
@@ -133,21 +150,21 @@ alternative_else_nop_endif
 
 	stp	x22, x23, [sp, #S_PC]
 
-	/* Not in a syscall by default (el0_svc overwrites for real syscall) */
+	/* デフォルトではシステムコールではない (el0_svcが実際のシステムコールで上書きする) */
 	.if	\el == 0
 	mov	w21, #NO_SYSCALL
 	str	w21, [sp, #S_SYSCALLNO]
 	.endif
 
 	/*
-	 * Set sp_el0 to current thread_info.
+	 * sp_el0にカレントスレッド情報をセット
 	 */
 	.if	\el == 0
 	msr	sp_el0, tsk
 	.endif
 
 	/*
-	 * Registers that may be useful after this macro is invoked:
+	 * このマクロの実行後に便利なレジスタ:
 	 *
 	 * x21 - aborted SP
 	 * x22 - aborted PC
@@ -156,13 +173,15 @@ alternative_else_nop_endif
 	.endm
 ```
 
-Now we are going to explore the `kernel_entry` macro in details.
+では、`kernel_entry`マクロを詳細に見ていきましょう。
 
 ```
     .macro    kernel_entry, el, regsize = 64
 ```
 
-The macro accepts 2 parameters: `el` and `regsize`. `el` can be either `0` or `1` depending on whether an exception was generated at EL0 or EL1. `regsize` is 32 if we came from 32-bit EL0 or 64 otherwise.
+このマクロは`el`と`regsize`の2つのパラメータを受け付けます。`el`は例外が
+EL0とEL1のいずれで発生したかにより、`0`または`1`になります。`regsize`は
+32ビットEL0から来た場合は32、そ例外は64になります。
 
 ```
     .if    \regsize == 32
@@ -170,7 +189,10 @@ The macro accepts 2 parameters: `el` and `regsize`. `el` can be either `0` or `1
     .endif
 ```
 
-In 32-bit mode, we use 32-bit general purpose registers (`w0` instead of `x0`).  `w0` is architecturally mapped to the lower part of `x0`. The provided code snippet zeroes upper 32 bits of the `x0` register by writing `w0` to itself.
+32ビットモードでは、32ビットの汎用レジスタ（`x0`ではなく`w0`）を使用します。
+`w0`はアーキテクチャ上、`x0`の下位にマッピングされています。上のコード
+スニペットでは`w0`を自分自身に書き込むことで`x0`レジスタの上位32ビットを
+ゼロにしています。
 
 ```
     stp    x0, x1, [sp, #16 * 0]
@@ -190,14 +212,26 @@ In 32-bit mode, we use 32-bit general purpose registers (`w0` instead of `x0`). 
     stp    x28, x29, [sp, #16 * 14]
 ```
 
-This part saves all general purpose registers on the stack. Note, that stack pointer was already adjusted in the [kernel_ventry](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L74) to fit everything that needs to be stored. The order in which we save registers matters because in Linux there is a special structure [pt_regs](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/ptrace.h#L119) that is used to access saved registers later inside an exception handler. As you might see this structure contains not only general purpose registers but also some other information, which is mostly populated later in the `kernel_entry` macro. I recommend you to remember `pt_regs` struct because we are going to implement and use a similar one in the next few lessons.
+この部分はすべての汎用レジスタをスタックに保存しています。なお、スタックポインタは
+すでに保存すべきすべてに合うように[kernel_ventry](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L74)で
+調整されています。レジスタを保存する順序は重要です。なぜなら、Linuxには特別な構造体[pt_regs](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/ptrace.h#L119)が
+あり、後で例外ハンドラが保存されたレジスタにアクセスする際に使用されるからです。
+見ればわかるように、この構造体には汎用レジスタだけでなく他の情報も含まれており、
+これらの情報は主に`kernel_entry`マクロの後の方で入力されます。`pt_regs`構造体は
+覚えて置いてください。なぜなら、次の数回のレッスンで同様の構造体を実装して使用
+する予定だからです。
 
 ```
     .if    \el == 0
     mrs    x21, sp_el0
 ```
 
-`x21` now contains aborted stack pointer. Note, that a task in Linux uses 2 different stacks for user and kernel mode. In case of user mode, we can use `sp_el0` register to figure out the stack pointer value at the moment when the exception was generated. This line is very important because we need to swap stack pointers during the context switch. We will talk about it in details in the next lesson.
+`x21`には現在、アボートしたスタックポインタが含まれています。Linuxのタスクは
+ユーザモード用とカーネルモード用の2つの異なるスタックを使用していることに注意して
+ください。ユーザモードの場合は、`sp_el0`レジスタを使って、例外が発生した瞬間の
+スタックポインタの値を知ることができます。コンテキストスイッチの際にスタック
+ポインタを交換する必要があるため、この行は非常に重要です。詳しくは次のレッスンで
+説明します。
 
 ```
     ldr_this_cpu    tsk, __entry_task, x20    // Ensure MDSCR_EL1.SS is clear,
@@ -205,25 +239,55 @@ This part saves all general purpose registers on the stack. Note, that stack poi
     disable_step_tsk x19, x20        // exceptions when scheduling.
 ```
 
-`MDSCR_EL1.SS` bit is responsible for enabling "Software Step exceptions". If this bit is set and debug exceptions are unmasked, an exception is generated after any instruction has been executed. This is commonly used by debuggers. When taking exception from user mode, we need to check first whether [TIF_SINGLESTEP](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/thread_info.h#L93) flag is set for the current task. If yes, this indicates that the task is executing under a debugger and we must unset `MDSCR_EL1.SS` bit.
-The important thing to understand in this code is how information about the current task is obtained. In Linux, each process or thread (later I will reference any of them as just "task") has a [task_struct](https://github.com/torvalds/linux/blob/v4.14/include/linux/sched.h#L519) associated with it. This struct contains all metadata information about a task. On `arm64` architecture `task_struct` embeds another structure that is called [thread_info](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/thread_info.h#L39) so that a pointer to `task_struct` can always be used as a pointer to `thread_info`. `thread_info` is the place were flags are stored along with some other low-level values that `entry.S` need direct access to.
+`MDSCR_EL1.SS`ビットは，"ソフトウェアステップ例外 "を有効にするためのビットです。
+このビットがセットされ、デバッグ例外がマスクされていない場合、任意の命令を実行
+後に例外が生成されます。これはデバッガでよく使われます。ユーザモードからの例外
+を処理する場合、まずカレントタスクに[TIF_SINGLESTEP](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/thread_info.h#L93)
+フラグが設定されているか確認する必要があります。設定されている場合、これはタスクが
+デバッガ下で実行されていることを示しており、`MDSCR_EL1.SS`ビットをクリアする
+必要があります。このコードで理解すべき重要な点は、カレントタスクに関する情報を
+どのように取得するかです。Linuxでは、プロセスやスレッド（今後、どちらも単に「タスク」と呼びます）には[task_struct](https://github.com/torvalds/linux/blob/v4.14/include/linux/sched.h#L519)が関連付けられています。この構造体にはタスクに関するすべての
+メタデータ情報が含まれています。`arm64`アーキテクチャでは`task_struct`は
+[thread_info](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/thread_info.h#L39)と
+呼ばれる別の構造体を内蔵しており、`task_struct`へのポインタは常に`thread_info`への
+ポインタとして使用することができます。`thread_info`にはフラグと`entry.S`が直接
+アクセスする必要のある低レベルの値が格納されます。
 
 ```
     mov    x29, xzr            // fp pointed to user-space
 ```
 
-Though `x29` is a general purpose register it usually has a special meaning. It is used as a "Frame pointer". Now I want to spend some time to explain its purpose.
+`x29`は汎用レジスタですが、通常は特別な意味を持っています。「フレームポインタ」と
+して使用されるからです。ここでは、その目的について少し説明したいと思います。
 
-When a function is compiled, the first couple of instructions are usually responsible for storing old frame pointer and link register values on the stack. (Just a quick reminder: `x30` is called link register and it holds a "return address" that is used by the `ret` instruction) Then a new stack frame is allocated, so that it can contain all local variables of the function, and frame pointer register is set to point to the bottom of the frame. Whenever the function needs to access some local variable it simply adds hardcoded offset to the frame pointer. Imagine now that an error has occurred and we need to generate a stack trace. We can use current frame pointer to find all local variables in the stack, and the link register can be used used to figure out the precise location of the caller. Next, we take advantage of the fact that old frame pointer and link register values are always saved at the beginning of the stack frame, and we just read them from there. After we get caller's frame pointer we can now access all its local variables as well. This process is repeated recursively until we reach the top of the stack and is called "stack unwinding". A similar algorithm is used by [ptrace](http://man7.org/linux/man-pages/man2/ptrace.2.html) system call.
+関数がコンパイルされると、最初の数命令は通常、古いフレームポインタとリンクレジスタの
+値をスタックに格納する役割を果たします（簡単に説明しておくと、`x30`はリンクレジスタ
+と呼ばれ、`ret`命令が使用する「リターンアドレス」を格納します）。次に、その関数の
+すべてのローカル変数を格納できるように新しいスタックフレームが割り当てられ、
+フレームポインタレジスタはこのフレームの底を指すように設定されます。関数が
+ローカル変数にアクセスする必要がある場合は、ハードコードされたオフセットをフレーム
+ポインタに加えるだけです。ここで、エラーが発生し、スタックトレースを作成する必要が
+あるとします。現在のフレームポインタを使用してスタックにあるすべてのローカル変数を
+見つけることができ、リンクレジスタを使用して呼び出し元の正確な位置を知ることが
+できます。さらに、古いフレームポインタとリンクレジスタの値が常にスタックフレームの
+先頭に保存されているので、これらの値はそこから読み込むだけです。呼び出し元の
+フレームポインタを取得すれば、呼び出し元のすべてのローカル変数にもアクセスできます。
+このプロセスはスタックの先頭に到達するまで再帰的に繰り返され、「スタック巻き戻し」と
+呼ばれます。同様のアルゴリズムは[ptrace](http://man7.org/linux/man-pages/man2/ptrace.2.html) システムコールでも使用されています。
 
-Now, going back to the `kernel_entry` macro, it should be clear why do we need to clear `x29` register after taking an exception from EL0. That is because in Linux each task uses a different stack for user and kernel mode, and therefore it doesn't make sense to have common stack traces.
+では、`kernel_entry`マクロの話に戻りますが、EL0からの例外を捕捉後に、なぜ`x29`
+レジスタをクリアする必要があるのかは明らかでしょう。それは、Linuxではタスクは
+ユーザモードとカーネルモードで異なるスタックを使用するため、共通のスタック
+トレースを持つことに意味がないからです。
 
 ```
     .else
     add    x21, sp, #S_FRAME_SIZE
 ```
 
-Now we are inside else clause, which mean that this code is relevant only if we are handling an exception taken from EL1. In this case, we are reusing old stack and the provided code snippet just saves original `sp` value in the `x21` register for later usage.
+ここではelse節に入っていますが、これはEL1からの例外を処理する場合にのみこのコードが
+有効であることを意味します。この場合、古いスタックを再利用しており、上のコード
+スニペットでは、後で使用するために元の`sp`値を`x21`レジスタに保存しているだけです。
 
 ```
     /* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
@@ -233,20 +297,31 @@ Now we are inside else clause, which mean that this code is relevant only if we 
     str    x20, [tsk, #TSK_TI_ADDR_LIMIT]
 ```
 
-Task address limit specifies the largest virtual address that can be used. When user process operates in 32-bit mode this limit is `2^32`. For 64 bit kernel it can be larger and usually is `2^48`. If it happens that an exception is taken from 32-bit EL1, task address limit need to be changed to [TASK_SIZE_64](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/memory.h#L80). Also, it is required to save the original address limit because it needs to be restored before the execution will be returned to user mode.
+タスクアドレス制限には使用可能な仮想アドレスの最大値を指定します。ユーザ
+プロセスが32ビットモードで動作する場合、この制限値は2^32です。64ビットカーネルの
+場合は、これよりも大きくなり、通常は2^48です。例外が32ビットのEL1で発生した場合は、
+タスクアドレス制限を[TASK_SIZE_64](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/memory.h#L80)に
+変更する必要があります。また、元のアドレス制限を保存する必要があります。実行を
+ユーザーモードに戻す前に元のアドレス制限を復元する必要があるためです。
 
 ```
     mrs    x22, elr_el1
     mrs    x23, spsr_el1
 ```
 
-`elr_el1` and `spsr_el1` must be saved on the stack before we start handling an exception. We haven't done it yet in the RPI OS, because for now we always return to the same location from which an exception was taken. But what if we need to do a context switch while handling an exception? We will discuss this scenario in details in the next lesson.
+`elr_el1`と`spsr_el1`は、例外処理を開始する前にスタックに保存しておく必要が
+あります。RPI OSではまだそれを行っていません。今のところ、常に例外が発生した
+時と同じ場所に戻るからです。しかし、例外処理中にコンテキストスイッチを行う
+必要がある場合はどうでしょうか。このシナリオについては、次のレッスンで詳しく
+説明します。
 
 ```
     stp    lr, x21, [sp, #S_LR]
 ```
 
-Link register and frame pointer registers are saved on the stack. We already saw that frame pointer is calculated differently depending on whether an exception was taken from EL0 or EL1 and the result of this calculation was already stored in `x21` register.
+リンクレジスタとフレームポインタレジスタをスタックに保存します。既に見たように、
+フレームポインタは例外がEL0とEL1のどちらで発生したかによって計算方法が異なり、
+その計算結果はすでに`x21`レジスタに保存されています。
 
 ```
     /*
@@ -262,7 +337,10 @@ Link register and frame pointer registers are saved on the stack. We already saw
     add    x29, sp, #S_STACKFRAME
 ```
 
-Here [stackframe](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/ptrace.h#L140) property of the `pt_regs` struct is filled. This property also contains link register and frame pointer, though this time the value of `elr_el1` (which is now in `x22`) is used instead of `lr`. `stackframe` is used solely for stack unwinding.
+ここでは`pt_regs`構造体の[stackframe](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/ptrace.h#L140)
+プロパティにデータを設定しています。このプロパティにはリンクレジスタとフレーム
+ポインタも含まれていますが、今回は`lr`の代わりに`elr_el1`値（現在は`x22`に入って
+います）が使われています。`stackframe`はスタックの巻き戻しのためだけに使われます。
 
 ```
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN
@@ -283,13 +361,17 @@ alternative_else_nop_endif
 #endif
 ```
 
-`CONFIG_ARM64_SW_TTBR0_PAN` parameter prevents the kernel from accessing user-space memory directly.  If you are wondering when this might be useful you can read [this](https://kernsec.org/wiki/index.php/Exploit_Methods/Userspace_data_usage) article. For now, I will also skip the detailed explanation of how this works, because such security features are too out of scope for our discussion.
+`CONFIG_ARM64_SW_TTBR0_PAN`パラメタは、カーネルがユーザー空間のメモリに直接
+アクセスすることを防ぎます。これがどのような場合に役立つのか気になる方は
+[この](https://kernsec.org/wiki/index.php/Exploit_Methods/Userspace_data_usage)
+記事をご覧ください。このようなセキュリティ機能は今回の議論にはまったくの
+範囲外であるため、ここではこの仕組みについての詳細な説明も省略します。
 
 ```
     stp    x22, x23, [sp, #S_PC]
 ```
 
-Here `elr_el1` and `spsr_el1` are saved on the stack.
+ここでは`elr_el1`と`spsr_el1`をスタックに保存しています。
 
 ```
     /* Not in a syscall by default (el0_svc overwrites for real syscall) */
@@ -299,7 +381,9 @@ Here `elr_el1` and `spsr_el1` are saved on the stack.
     .endif
 ```
 
-`pt_regs` struct has a [field](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/ptrace.h#L132) indicating whether the current exception is a system call or not. By default, we assume that it isn't. Wait till lecture 5 for the detailed explanation how syscalls work.
+`pt_regs`構造体には、現在の例外がシステムコールであるかを示すフィールドが
+あります。デフォルトでは、システムコールではないと仮定します。システムコールの
+仕組みに関する詳しい説明はレッスン 5までお待ちください。
 
 ```
     /*
@@ -310,11 +394,17 @@ Here `elr_el1` and `spsr_el1` are saved on the stack.
     .endif
 ```
 
-When a task is executed in kernel mode, `sp_el0` is not needed. Its value was previously saved on the stack so it can be easily restored in `kernel_exit` macro. Starting from this point `sp_el0` will be used to hold a pointer to current [task_struct](https://github.com/torvalds/linux/blob/v4.14/include/linux/sched.h#L519) for quick access.
+タスクがカーネルモードで実行され場合は`sp_el0`は必要ありません。`sp_el0`の値は
+あらかじめスタックに保存されているので、`kernel_exit`マクロで簡単に復元する
+ことができます。この時点から`sp_el0`は現在の[task_struct](https://github.com/torvalds/linux/blob/v4.14/include/linux/sched.h#L519)に素早くアクセスするためのポインタを
+保持することになります。
 
 ### el1_irq
 
-Next thing we are going to explore is the handler that is responsible for processing IRQs taken from EL1. From the [vector table](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L374) we can easily find out that the handler is called `el1_irq` and is defined [here](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L562). Let's take a look on the code now and examine it line by line.
+次に調査するのはEL1からのIRQを処理するハンドラです。[ベクタテーブル](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L374)
+から、そのハンドラが`el1_irq`と呼ばれ、[`entry.S#L562`](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L562)で
+定義されていることを簡単に見つけることができます。それでは、コードを一行ずつ
+見ていきましょう。
 
 ```
 el1_irq:
@@ -341,15 +431,24 @@ el1_irq:
 ENDPROC(el1_irq)
 ```
 
-The following is done inside this function.
+この関数では次のことが行われます。
 
-* `kernel_entry` and `kernel_exit` macros are called to save and restore processor state. The first parameter indicates that the exception is taken from EL1.
-* Debug interrupts are unmasked by calling `enable_dbg` macro. At this point, it is safe to do so, because the processor state is already saved and, even if debug exception occurred in the middle of the interrupt handler, it will be processed correctly. If you wonder why is it necessary to unmask debug exceptions during an interrupt processing in the first place - read [this](https://github.com/torvalds/linux/commit/2a2830703a2371b47f7b50b1d35cb15dc0e2b717) commit message.
-* Code inside `#ifdef CONFIG_TRACE_IRQFLAGS` block is responsible for tracing interrupts. It records 2 events: interrupt start and end.
-* Code inside `#ifdef CONFIG_PREEMPT` block access current task flags to check whether we need to call the scheduler. This code will be examined details in the next lesson.
-* `irq_handler` - this is the place were actual interrupt handling is performed.
+* `kernel_entry`マクロと`kernel_exit`マクロが呼び出され、プロセッサの状態を
+保存・復元します。最初のパラメータは例外がEL1で発生したものであることを示します。
+* `enable_dbg`マクロを呼び出してデバッグ割り込みのマスクを外します。この時点で
+それを行うことは安全です。プロセッサの状態はすでに保存されており、仮に割り込み
+ハンドラの途中でデバッグ例外が発生しても、正しく処理されるためです。そもそも、
+なぜ割り込み処理中にデバッグ例外のマスクを外す必要があるのか疑問に思う方は
+[この](https://github.com/torvalds/linux/commit/2a2830703a2371b47f7b50b1d35cb15dc0e2b717)
+コミットメッセージをお読みください。
+* `#ifdef CONFIG_TRACE_IRQFLAGS`ブロック内のコードは割込みのトレースを行っています。
+割り込みの開始と終了の2つのイベントを記録します。
+* `#ifdef CONFIG_PREEMPT`ブロック内のコードはカレントタスクのフラグにアクセスして
+スケジューラを呼び出す必要があるかチェックします。このコードについては次の
+レッスンで詳しく調べます。
+* `irq_handler` - これが実際に割り込み処理が行われる場所です。
 
-[irq_handler](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L351) is a macro and it is defined as the follows.
+[irq_handler](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L351)はマクロで、次のように定義されています。
 
 ```
     .macro    irq_handler
@@ -361,18 +460,30 @@ The following is done inside this function.
     .endm
 ```
 
-As you might see from the code, `irq_handler` executes [handle_arch_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L44)  function. This function is executed with special stack, that is called "irq stack".  Why is it necessary to switch to a different stack? In RPI OS, for example, we didn't do this.  Well, I guess it is not necessary, but without it, an interrupt will be handled using task stack, and we can never be sure how much of it is still left for the interrupt handler.
+コードからわかるように、`irq_handler`は[handle_arch_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L44)
+関数を実行します。この関数は「irqスタック」と呼ばれる特別なスタックで実行されます。
+なぜ、別のスタックに切り替える必要があるのでしょうか。たとえば、RPI OSではこのような
+ことはしていません。まあ、おそらく必要ないのですが、これがないと割り込みがタスク
+スタックを使って処理されることになりますが、割り込みハンドラのためにスタックが
+どれだけ残っているかはわからないからです。
 
-Next, we need to look at [handle_arch_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L44). It appears that it is not a function, but a variable. It is set inside [set_handle_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L46) function. But who sets it, and what is the fade of an interrupt after it reaches this point? We will figure out the answer in the next chapter of this lesson.
+次に、[handle_arch_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L44)を
+調べる必要があります。これは関数ではなく、変数のようです。これは[set_handle_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L46)
+関数で設定されています。しかし、誰がこれを設定しているのでしょうか。また、この
+地点に到達後、この割り込みはどうなるのでしょうか。その答えは、このレッスンの
+次の章で解明します。
 
-### Conclusion
+### 結論
 
-As a conclusion, I can say that we've already explored the low-level interrupt handling code and trace the path of an interrupt from the vector table all the way to the `handle_arch_irq`. This is the point were an interrupt leaves architecture specific code and started to be handled by a driver code. Our goal in the next chapter will be to trace the path of a timer interrupt through the driver source code.
+結論として、これまでに低レベル割り込み処理コードを調査し、ベクタテーブルから `handle_arch_irq`までの割り込みのすべての経路を追跡してきました。ここは
+割り込みがアーキテクチャ固有のコードを離れ、ドライバコードによる処理が開始される
+地点です。次の章ではドライバのソースコードを通じてタイマ割込みの経路を追跡する
+ことを目標とします。
 
-##### Previous Page
+##### 前ページ
 
-3.1 [Interrupt handling: RPi OS](../../../ja/lesson03/rpi-os.md)
+3.1 [割り込みハンドラ: RPi OS](../../../ja/lesson03/rpi-os.md)
 
-##### Next Page
+##### 次ページ
 
-3.3 [Interrupt handling: Interrupt controllers](../../../ja/lesson03/linux/interrupt_controllers.md)
+3.3 [割り込みハンドラ: 割り込みコントローラ](../../../ja/lesson03/linux/interrupt_controllers.md)
