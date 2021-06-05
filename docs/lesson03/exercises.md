@@ -1,17 +1,13 @@
-## 3.5: 演習
+## 3.5: Exercises
 
-1. プロセッサ割り込みの生成にシステムタイマではなくローカルタイマを使用してください。
-詳細は[このissue](https://github.com/s-matyukevich/raspberry-pi-os/issues/70)を参照してください。
-2. MiniUART割り込みを処理してください。`kernel_main`関数の最後のループを何もしないループに
-置き換えてください。ユーザが新しい文字を入力したらすぐに割り込みを発生するようにMiniUART
-デバイスを設定してください。新たに入力された各文字を画面に表示する役割を担う割り込み
-ハンドラを実装してください。
-3. レッスン03をqemu上で実行できるようにしてください。[このissue](https://github.com/s-matyukevich/raspberry-pi-os/issues/8)を参考にしてください。
+1. Use local timer instead of the system timer to generate processor interrupts. See [this](https://github.com/s-matyukevich/raspberry-pi-os/issues/70) issue for details.
+1. Handle MiniUART interrupts. Replace the final loop in the `kernel_main` function with a loop that does nothing. Setup MiniUART device to generate an interrupt as soon as the user types a new character. Implement an interrupt handler that will be responsible for printing each newly arrived character on the screen.
+1. Adapt lesson 03 to run on qemu. Check [this](https://github.com/s-matyukevich/raspberry-pi-os/issues/8) issue for reference.
 
-##### 前ページ
+##### Previous Page
 
-3.4 [割り込み処理: タイマ](../../docs/lesson03/linux/timer.md)
+3.4 [Interrupt handling: Timers](../../docs/lesson03/linux/timer.md)
 
-##### 次ページ
+##### Next Page
 
-4.1 [プロセススケジューラ: RPi OSスケジューラ](../../docs/lesson04/rpi-os.md)
+4.1 [Process scheduler: RPi OS Scheduler](../../docs/lesson04/rpi-os.md)

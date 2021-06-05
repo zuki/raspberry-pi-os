@@ -1,77 +1,34 @@
-## 3.1: 割り込み
+## 3.1: Interrupts
 
-レッスン1では、ハードウェアとの通信方法について説明しました。しかし、たいていの
-場合、通信のパターンはそれほど単純ではありません。通常、このパターンは非同期的な
-ものです。私たちはデバイスに何らかのコマンドを送りますが、デバイスはすぐには応答
-しません。代わりに作業が完了した時に通知してくれます。このような非同期の通知は
-「割り込み」と呼ばれます。通常の実行フローに割り込み、プロセッサに「割り込み
-ハンドラ」を実行させるからです。
+From the lesson 1, we already know how to communicate with hardware. However, most of the time the pattern of communication is not that simple. Usually, this pattern is asynchronous: we send some command to a device, but it doesn't respond immediately. Instead, it notifies us when the work is completed. Such asynchronous notifications are called "interrupts" because they interrupt normal execution flow and force the processor to execute an "interrupt handler".
 
-オペレーティングシステムの開発において、特に有用なデバイスがあります。システム
-タイマです。これは事前に定義した頻度でプロセッサに定期的に割り込みをかけるように
-設定できるデバイスです。タイマは特別な応用の一つとしてプロセスのスケジュー
-リングに使われます。スケジューラは、各プロセスの実行時間を測定し、その情報を
-もとに次に実行するプロセスを選択する必要があります。この計測にタイマによる
-割り込みが使われます。
+There is one device that is particularly useful in operating system development: system timer. It is a device that can be configured to periodically interrupt a processor with some predefined frequency. One particular application of the timer that it is used in the process scheduling. A scheduler needs to measure for how long each process has been executed and use this information to select the next process to run. This measurement is based on timer interrupts.
 
-プロセスのスケジューリングについては、次のレッスンで詳しく説明しますが、
-ここでは、システムタイマを初期化し、タイマ割り込みハンドラを実装することに
-します。
+We are going to talk about process scheduling in details in the next lesson, but for now, our task will be to initialize system timer and implement a timer interrupt handler.
 
-### 割り込みと例外
+### Interrupts vs exceptions
 
-ARM.v8アーキテクチャでは、割り込みはより一般的な用語である「例外」の一部です。
-例外には次の4つのタイプがあります。
+In ARM.v8 architecture, interrupts are part of a more general term: exceptions. There are 4 types of exceptions
 
-* **同期例外** このタイプの例外は、常に現在実行中の命令によって引き起こされます。
-たとえば、`str`命令を使用して存在しないメモリ位置にデータを格納してしまうことが
-あります。この場合、同期例外が発生します。同期例外は「ソフトウェア割り込み」を発生
-させるためにも使用できます。ソフトウェア割り込みとは`svc`命令によって意図的に
-発生させる同期例外です。レッスン5ではこのテクニックを使ってシステムコールを
-実装します。
-* **IRQ（Interrupt Request）** 通常の割り込みです。常に非同期であり、現在実行
-中の命令とは何の関係もありません。同期例外とは対照的に、常にプロセッサ自身では
-なく、外部のハードウェアによって生成されます。
-* **FIQ (Fast Interrupt Request)** このタイプの例外は「高速割り込み」と呼ばれ、
-例外の優先順位を決めるためだけに存在します。一部の割り込みを「通常」、その他を
-「高速」として設定することができます。高速な割り込みは最初にシグナルが送られ、
-別の例外ハンドラで処理されます。Linuxでは高速割り込みは使用しません。私たちも
-使用するつもりはありません。
-* **SError (System Error)** `IRQ`や`FIQ`と同様に、`SError`例外も非同期であり、
-外部のハードウェアによって生成されます。`IRQ`や`FIQ`とは異なり、`SError`は常に
-何らかのエラー状態を示します。どのような場合に`SError`が発生するのかを説明して
-いる例を[ここ](https://community.arm.com/processors/f/discussions/3205/re-what-is-serror-detailed-explanation-is-required)で見ることができます。
+* **Synchronous exception** Exceptions of this type are always caused by the currently executed instruction. For example, you can use `str` instruction to store some data at an unexistent memory location. In this case, a synchronous exception is generated. Synchronous exceptions also can be used to generate a "software interrupt". Software interrupt is a synchronous exception that is generated on purpose by `svc` instruction. We will use this technique in lesson 5 to implement system calls.
+* **IRQ (Interrupt Request)** Those are normal interrupts. They are always asynchronous, which means that they have nothing to do with the currently executed instruction.  In contrast to synchronous exceptions, they are always not generated by the processor itself, but by external hardware.
+* **FIQ (Fast Interrupt Request)** This type of exception is called "fast interrupts" and exist solely for the purpose of prioritizing exceptions. It is possible to configure some interrupts as "normal" and other as "fast". Fast interrupts will be signaled first and will be handled by a separate exception handler. Linux doesn't use fast interrupts and we also are not going to do so.
+* **SError (System Error)** Like `IRQ` and `FIQ`, `SError` exceptions are asynchronous and are generated by external hardware. Unlike `IRQ` and `FIQ`, `SError` always indicates some error condition. [Here](https://community.arm.com/processors/f/discussions/3205/re-what-is-serror-detailed-explanation-is-required) you can find an example explaining when `SError` can be generated.
 
-### 例外ベクタ
+### Exception vectors
 
-例外の各タイプには独自のハンドラが必要です。また、例外が発生した実行状態ごとに
-個別のハンドラを定義する必要があります。例外処理の観点から4つの興味深い実行
-状態があります。EL1を対象とした場合、これらの状態は以下のように定義できます。
+Each exception type needs its own handler. Also, separate handlers should be defined for each different execution state, in which exception is generated. There are 4 execution states that are interesting from the exception handling standpoint. If we are working at EL1 those states can be defined as follows:
 
-1. **EL1t** スタックポインタがEL0と共有されている時に、EL1で例外が発生した。
-これは`SPSel`レジスタが値`0`を保持している場合に起こります。
-2. **EL1h** EL1に専用のスタックポインタが割り当てられていた時に、EL1で例外が
-発生した。これは`SPSel`が値`1`を保持していることを意味し、これが現在使用されて
-いるモードです。
-3. **EL0_64** 64ビットモードで実行中のEL0で例外が発生した。
-4. **EL0_32** 32ビットモードで実行中のEL0で例外が発生した。
+1. **EL1t** Exception is taken from EL1 while stack pointer was shared with EL0. This happens when `SPSel` register holds the value `0`.
+1. **EL1h** Exception is taken from EL1 at the time when dedicated stack pointer was allocated for EL1. This means that `SPSel` holds the value `1` and this is the mode that we are currently using.
+1. **EL0_64** Exception is taken from EL0 executing in 64-bit mode.
+1. **EL0_32** Exception is taken from EL0 executing in 32-bit mode.
 
-合計で16個の例外ハンドラ（4つの例外レベル×4つの実行状態）を定義する必要があります。
-すべての例外ハンドラのアドレスを保持する特別な構造体は、*例外ベクタテーブル*
-または単に*ベクタテーブル*と呼ばれています。ベクタテーブルの構造は[AArch64リファレンスマニュアル](https://developer.arm.com/docs/ddi0487/ca/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile)の
-1876ページにある「表D1-7 ベクタテーブルベースアドレスからのベクタオフセット」で
-定義されています。ベクタテーブルは例外ベクタの配列と考えることができます。各例外
-ベクタ（またはハンドラ）は対象の例外を処理するための命令シーケンスです。「AArch64
-リファレンスマニュアル」の「表D1-7」によると、各例外ベクタは最大で0x80バイトを
-占めることができます。これは大した量ではありませんが、例外ベクタから他のメモリ
-位置にジャンプすることを妨げるものはありません。
+In total, we need to define 16 exception handlers (4 exception levels multiplied by 4 execution states) A special structure that holds addresses of all exception handlers is called *exception vector table* or just *vector table*. The structure of a vector table is defined in `Table D1-7 Vector offsets from vector table base address` at page 1876 of the [AArch64-Reference-Manual](https://developer.arm.com/docs/ddi0487/ca/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile). You can think of a vector table as an array of exception vectors, where each exception vector (or handler) is a continuous sequence of instructions responsible for handling a particular exception. Accordingly, to `Table D1-7` from `AArch64-Reference-Manual`, each exception vector can ocupy `0x80` bytes maximum. This is not much, but nobody prevents us from jumping to some other memory location from an exception vector. 
 
-これらのすべては例を見ればもっと明らかだと思います。それでは、RPI-OSで例外ベクタが
-どのように実装されているかを見てみましょう。例外処理に関連するものはすべては
-[entry.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S)で定義されています。今からそれを調べていきましょう。
+I think all of this will be much clearer with an example, so now it is time to see how exception vectors are implemented in the RPI-OS. Everything related to exception handling is defined in [entry.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S) and we are going to start examining it right now.
 
-最初の便利なマクロは[ventry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L12)であり、
-ベクタテーブルのエントリの作成に使用されます。
+The first useful macro is called [ventry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L12) and it is used to create entries in the vector table.
 
 ```
     .macro    ventry    label
@@ -80,18 +37,9 @@ ARM.v8アーキテクチャでは、割り込みはより一般的な用語で�
     .endm
 ```
 
-この定義から推測されるように、例外の処理は例外ベクタの中では行わず、
-マクロの`label`引数として与えられたラベルにジャンプします。ここでは
-`.align 7`命令が必要です。すべての例外ベクタは互いに0x80(=2^7)バイトの
-オフセットに配置される必要があるためです。
+As you might infer from this definition, we are not going to handle exceptions right inside the exception vector, but instead, we jump to a label that is provided for the macro as `label` argument. We need `.align 7` instruction because all exception vectors should be located at offset `0x80` bytes one from another. 
 
-ベクタテーブルは[`entry.S#L64`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L64)で
-定義されており、16個の`ventry`定義で構成されています。今のところ`EL1h`からの
-`IRQ`を処理することにしか興味がありませんが、それでも16個のハンドラをすべて
-定義する必要があります。これはハードウェアの要件ではなく、何か問題が発生した
-際に意味のあるエラーメッセージを表示させたいためです。通常のフローでは絶対に
-実行されないはずのハンドラにはすべて`invalid`の後置詞をつけ、[handle_invalid_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L3)
-マクロを使用しています。このマクロがどのように定義されているかを見てみましょう。
+Vector table is defined [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L64) and it consists of 16 `ventry` definitions. For now we are only interested in handling `IRQ` from `EL1h` but we still need to define all 16 handlers. This is not because of some hardware requirement, but rather because we want to see a meaningful error message in case something goes wrong. All handlers that should never be executed in normal flow have `invalid` postfix and uses [handle_invalid_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L3) macro. Let's take a look at how this macro is defined.
 
 ```
     .macro handle_invalid_entry type
@@ -104,42 +52,19 @@ ARM.v8アーキテクチャでは、割り込みはより一般的な用語で�
     .endm
 ```
 
-1行目では`kernel_entry`という別のマクロが使われているのがわかります。これに
-ついてはすぐに説明します。次に、[show_invalid_entry_message](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L34)を
-呼び出すために3つの引数を用意します。最初の引数は例外タイプで[`entry.h#L6`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/include/entry.h#L6)のいずれかの
-値を取ります。これはどの例外ハンドラが実行されるのかを正確に教えてくれます。
-2番目の引数は最も重要なもので、`ESR`（Exception Syndrome Register）と
-呼ばれています。この引数は「AArch64リファレンスマニュアル」の2431ページに記載
-されている`esr_el1`レジスタから取得します。このレジスタには、例外の原因についての
-詳しい情報が含まれています。3番目の引数は特に同期例外の場合に重要です。この値は
-すでにおなじみの`elr_el1`レジスタから取得します。`elr_el1`レジスタには例外発生
-時に実行されていた命令のアドレスが格納されています。同期例外の場合、これは例外を
-発生させた命令でもあります。`show_invalid_entry_message`関数がこれらすべての
-情報を画面に表示した後は、他にできることはあまりないので、プロセッサを無限
-ループにします。
+In the first line, you can see that another macro is used: `kernel_entry`. We will discuss it shortly.
+Then we call [show_invalid_entry_message](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L34) and prepare 3 arguments for it. The first argument is exception type that can take one of [these](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/include/entry.h#L6) values. It tells us exactly which exception handler has been executed.
+The second parameter is the most important one, it is called `ESR` which stands for Exception Syndrome Register. This argument is taken from `esr_el1` register, which is described on page 2431 of `AArch64-Reference-Manual`. This register contains detailed information about what causes an exception. 
+The third argument is important mostly in case of synchronous exceptions. Its value is taken from already familiar to us `elr_el1` register, which contains the address of the instruction that had been executed when the exception was generated. For synchronous exceptions, this is also the instruction that causes the exception.
+After `show_invalid_entry_message`  function prints all this information to the screen we put the processor in an infinite loop because there is not much else we can do.
 
-### レジスタ状態を保存する
+### Saving register state
 
-例外ハンドラの実行終了後には、すべての汎用レジスタの値が例外発生前と同じになる
-ようにします。このような機能を実装しないと、現在実行中のコードとは関係のない
-割り込みが、そのコードの動作に予想外の影響を与えることになります。そのため、
-例外の発生後に最初にしなければならないことは、プロセッサの状態を保存すること
-です。これは[kernel_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S)マクロで
-行われています。このマクロは非常にシンプルです。レジスタ`x0 - x30`をスタックに
-格納するだけです。また、対応する[kernel_exit](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L37)マクロがあり、
-これは例外ハンドラの実行終了後に呼び出されます。`kernel_exit`は`x0 - x30`
-レジスタの値を書き戻してプロセッサの状態を復元します。このマクロはまた、`eret`
-命令を実行して通常の実行フローに戻します。ところで、例外ハンドラを実行する前に
-保存する必要があるのは汎用レジスタだけではありません。しかし、今回のシンプルな
-カーネルでは今のところこれで十分です。この後のレッスンで`kernel_entry`マクロと
-`kernel_exit`マクロにさらに機能を追加していきます。
+After an exception handler finishes execution, we want all general purpose registers to have the same values they had before the exception was generated. If we don't implement such functionality, an interrupt that has nothing to do with currently executing code, can influence the behavior of this code unpredictably. That's why the first thing we must do after an exception is generated is to save the processor state. This is done in the [kernel_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S) macro. This macro is very simple: it just stores registers `x0 - x30` to the stack. There is also a corresponding macro [kernel_exit](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/entry.S#L37), which is called after an exception handler finishes execution. `kernel_exit` restores processor state by copying back the values of `x0 - x30` registers. It also executes `eret` instruction, which returns us back to normal execution flow. By the way, general purpose registers are not the only thing that needs to be saved before executing an exception handler, but it is enough for our simple kernel for now. In later lessons, we will add more functionality to the `kernel_entry` and `kernel_exit` macros.
 
-### ベクタテーブルを設定する
+### Setting the vector table
 
-さて、これでベクタテーブルの準備はできましたが、プロセッサはそれがどこにあるのか
-知らないので使うことができません。例外処理を機能させるためには、`vbar_el1`
-（ベクタベースアドレスレジスタ）にベクタテーブルのアドレスを設定する必要が
-あります。これは[`irq.S#L2`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.S#L2)で行っています。
+Ok, now we have prepared the vector table, but the processor doesn't know where it is located and therefore can't use it. In order for the exception handling to work, we must set `vbar_el1` (Vector Base Address Register) to the vector table address. This is done [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.S#L2).
 
 ```
 .globl irq_vector_init
@@ -149,25 +74,13 @@ irq_vector_init:
     ret
 ```
 
-### 割り込みをマスク/アンマスクする
+### Masking/unmasking interrupts
 
-もうひとつ必要なことは、すべてのタイプの割り込みをアンマスクすることです。
-割り込みの「アンマスク」とはどういうことか説明しましょう。特定のコードが
-非同期割込みを受けないようにする必要がある場合があります。たとえば、
-`kernel_entry`マクロの途中で割込みが発生した場合を想像してみてください。
-この場合、プロセッサの状態は上書きされて失われてしまいます。そのため、
-例外ハンドラが実行されると、プロセッサは自動的にすべてのタイプの割り込みを
-無効にします。これを割り込みの「マスク」といいますが、これも必要に応じて手動で
-行うことができます。
+Another thing that we need to do is to unmask all types of interrupts. Let me explain what I mean by "unmasking" an interrupt. Sometimes there is a need to tell that a particular piece of code must never be intercepted by an asynchronous interrupt. Imagine, for example, what happens if an interrupt occurs right in the middle of `kernel_entry` macro? In this case, processor state would be overwritten and lost. That's why whenever an exception handler is executed, the processor automatically disables all types of interrupts. This is called "masking", and this also can be done manually if we need to do so.
 
-多くの人は、例外ハンドラの実行中はずっと割り込みをマスクしなければならないと
-勘違いしています。これは真実ではありません。プロセッサの状態を保存した後に
-割り込みをアンマスクすることは全く問題はありません。そのため、ネストした割り
-込みもできるのです。今すぐにこれを行うわけではありませんが、これは覚えて
-おくべき重要な情報です。
+Many people mistakenly think that interrupts must be masked for the whole duration of the exception handler. This isn't true - it is perfectly legal to unmask interrupts after you saved processor state and therefore it is also legal to have nested interrupts. We are not going to do this right now, but this is important information to keep in mind.
 
-[次の2つの関数](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.S#L7-L15)が
-割り込みのマスクとアンマスクを担当します。
+The [following two functions](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.S#L7-L15) are responsible for masking and unmasking interrupts.
 
 ```
 .globl enable_irq
@@ -181,53 +94,22 @@ disable_irq:
         ret
 ```
 
-ARMプロセッサの状態にはさまざまな種類の割り込みのマスク状態を保持する
-4つのビットがあります。これらのビットは以下のように定義されています。
+ARM processor state has 4 bits that are responsible for holding mask status for different types of interrupts. Those bits are defined as following.
 
-* **D** デバッグ例外をマスクします。これは特別なタイプの同期例外です。
-当然ですが、すべての同期例外をマスクすることはできませんが、デバッグ例外を
-マスクできるフラグを個別に用意しておくと便利です。
-* **A** `SErrors`をマスクします。`SErrors`は非同期アボートと呼ばれることが
-あるため、`A`と呼ばれています。
-* **I** `IRQ`をマスクします。
-* **F** `FIQ`をマスクします。
+* **D**  Masks debug exceptions. These are a special type of synchronous exceptions. For obvious reasons, it is not possible to mask all synchronous exceptions, but it is convenient to have a separate flag that can mask debug exceptions.
+* **A** Masks `SErrors`. It is called `A` because `SErrors` sometimes are called asynchronous aborts.
+* **I** Masks `IRQs`
+* **F** Masks `FIQs`
 
-さて、割り込みマスクの状態を変更する役割を持つレジスタがなぜ`daifclr`と
-`daifset`と呼ばれるかはお分かりいただけたと思います。これらのレジスタは
-プロセッサの状態の割り込みマスクの状態ビット(D, A, I, F)のセットとクリア
-をするからです。
+Now you can probably guess why registers that are responsible for changing interrupt mask status are called `daifclr` and `daifset`. Those registers set and clear interrupt mask status bits in the processor state.
 
-最後に気になるのはなぜ両関数で定数値2を使っているのかということでしょう。
-それは、ここでは2番目のビット（`I`）の設定とクリアだけを行いたいからです。
+The last thing you may wonder about is why do we use constant value `2` in both of the functions? This is because we only want to set and clear second (`I`) bit.
 
+### Configuring interrupt controller
 
-### 割り込みコントローラを設定する
+Devices usually don't interrupt processor directly: instead, they rely on interrupt controller to do the job. Interrupt controller can be used to enable/disable interrupts sent by the hardware. We can also use interrupt controller to figure out which device generates an interrupt. Raspberry PI has its own interrupt controller that is described on page 109 of [BCM2837 ARM Peripherals manual](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf).
 
-通常、デバイスはプロセッサに直接割り込みをかけることはありません。代わりに
-割り込みコントローラに仕事を依頼します。割込みコントローラはハードウェアから
-送られてくる割込みを有効にしたり、無効にしたりするために使用できます。
-また、割り込みコントローラを使って、どのデバイスが割り込みを発生させた
-のかを把握することもできます。
-Raspberry PIは、[BCM2837 ARMペリフェラルマニュアル](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf)
-の109ページに記載されている独自の割り込みコントローラを持っています。
-
-Raspberry Piの割り込みコントローラには3つのレジスタがあり、すべてのタイプの
-割り込みの有効/無効の状態を保持しています。今のところ、関心のあるのはタイマ
-割り込みだけです。これらの割り込みはマニュアルの116ページに記載されている[ENABLE_IRQS_1](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/include/peripherals/irq.h#L10)
-レジスタを使って有効にすることができます。マニュアルによると、割り込みは2つの
-バンクに分けられています。最初のバンクは割り込み`0 - 31`で構成されており、
-`ENABLE_IRQS_1`レジスタの対象のビットを設定することでこれらの割り込みの有効/無効
-を設定することができます。また、最後の32個の割り込みに対応するレジスタ
-`ENABLE_IRQS_2`と、ARMローカル割り込みと共にいくつかの一般的な割り込みを制御
-するレジスタ`ENABLE_BASIC_IRQS`があります（ARMローカル割り込みについては、
-このレッスンの次の章で説明します）。しかし、このマニュアルには多くの間違いが
-あり、そのうちの1つは今回の議論に直接関係しています。ペリフェラルの割り込み
-テーブル（マニュアルの113ページに記載されています）には`0 - 3`行目にシステム
-タイマからの4つの割り込みが入っているはずです。Linuxソースコードのリバース
-エンジニアリと[その他のいくつかの情報源](http://embedded-xinu.readthedocs.io/en/latest/arm/rpi/BCM2835-System-Timer.html)から、タイマ割り込みの0と2はGPUが使用
-するために予約されており、タイマ割り込みの1と3が他の目的に使用できることが
-わかりました。システムタイマIRQ番号1を有効にする[関数](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L29) を
-以下に示します。
+Raspberry Pi interrupt controller has 3 registers that hold enabled/disabled status for all types of interrupts. For now, we are only interested in timer interrupts, and those interrupts can be enabled using [ENABLE_IRQS_1](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/include/peripherals/irq.h#L10) register, which is described at page 116 of `BCM2837 ARM Peripherals manual`. According to the documentation, interrupts are divided into 2 banks. The first bank consists of interrupts `0 - 31`, each of these interrupts can be enabled or disabled by setting different bits of `ENABLE_IRQS_1` register. There is also a corresponding register for the last 32 interrupts - `ENABLE_IRQS_2` and a register that controls some common interrupts together with ARM local interrupts - `ENABLE_BASIC_IRQS` (We will talk about ARM local interrupts in the next chapter of this lesson). The Peripherals manual, however, has a lot of mistakes and one of those is directly relevant to our discussion. Peripheral interrupt table (which is described at page 113 of the manual) should contain 4 interrupts from system timer at lines `0 - 3`. From reverse engineering Linux source code and reading [some other sources](http://embedded-xinu.readthedocs.io/en/latest/arm/rpi/BCM2835-System-Timer.html) I was able to figure out that timer interrupts 0 and 2 are reserved and used by GPU and interrupts 1 and 3 can be used for any other purposes. So here is the [function](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L29) that enables system timer IRQ number 1.
 
 ```
 void enable_interrupt_controller()
@@ -236,10 +118,9 @@ void enable_interrupt_controller()
 }
 ```
 
-### 汎用IRQハンドラ
+### Generic IRQ handler
 
-先の説明で、すべての`IRQ`の処理を担当する1つの例外ハンドラがあることを覚えて
-いると思います。このハンドラは[`irq.c#L39`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L39)で定義されています。
+From our previous discussion, you should remember that we have a single exception handler that is responsible for handling all `IRQs`. This handler is defined [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L39).
 
 ```
 void handle_irq(void)
@@ -255,28 +136,11 @@ void handle_irq(void)
 }
 ```
 
-ハンドラでは、どのデバイスが割り込みを発生させたのかを把握する方法が必要です。
-これには割り込みコントローラが助けてくれます。割り込みコントローラは割り込み
-`0 - 31`の割り込み状態を保持する`IRQ_PENDING_1`レジスタを持っています。
-このレジスタを使用して、現在の割り込みがタイマによって生成されたものか、他の
-デバイスによって生成されたものかを確認し、デバイス固有の割り込みハンドラを
-呼び出すことができます。なお、複数の割り込みが同時に発生する可能性があります。
-このため、各デバイス固有の割り込みハンドラは、割り込みの処理が完了したことを
-確認してから`IRQ_PENDING_1`の割り込み保留ビットをクリアしなければなりません。
-同じ理由で、製品版のOSでは、割り込みハンドラのswitchコンストラクトをループで
-包むことになるでしょう。そうすれば、1回のハンドラ実行で複数の割り込みを処理
-することができるからです。
+In the handler, we need a way to figure out what device was responsible for generating an interrupt. Interrupt controller can help us with this job: it has `IRQ_PENDING_1` register that holds interrupt status for interrupts `0 - 31`. Using this register we can check whether the current interrupt was generated by the timer or by some other device and call device specific interrupt handler. Note, that multiple interrupts can be pending at the same time. That's why each device specific interrupt handler must acknowledge that it completed handling the interrupt and only after that interrupt pending bit in `IRQ_PENDING_1` will be cleared. Because of the same reason, for a production ready OS you would probably want to wrap switch construct in the interrupt handler in a loop: in this way, you will be able to handle multiple interrupts during a single handler execution. 
 
-### タイマの初期化
+### Timer initialization
 
-Raspberry Piのシステムタイマは非常にシンプルなデバイスで、クロックが1 tick
-刻むたびに値が1ずつ増加するカウンタを備えています。また、割り込みコントローラに
-接続されている4本の割り込みライン（そのため4つの異なる割り込みを発生させる
-ことができます）とそれに対応する4つのコンペアレジスタを備えています。カウンタの
-値がいずれかのコンペアレジスタに格納されている値と等しくなると対応する
-割り込みが発生します。このため、システムタイマ割り込みを使用する前に、いずれかの
-コンペアレジスタをゼロ以外の値で初期化する必要があります。この値が大きいほど、
-割り込みの発生が遅くなります。これは[timer_init](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/timer.c#L8) 関数で行っています。
+Raspberry Pi system timer is a very simple device. It has a counter that increases its value by 1 after each clock tick. It also has 4 interrupt lines that connect to the interrupt controller(so it can generate 4 different interrupts)  and 4 corresponding compare registers. When the value of the counter becomes equal to the value stored in one of the compare registers the corresponding interrupt is fired. That's why, before we will be able to use system timer interrupts, we need to initialize one of the compare registers with a non-zero value, the larger the value is - the later an interrupt will be generated. This is done in [timer_init](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/timer.c#L8) function.
 
 ```
 const unsigned int interval = 200000;
@@ -290,13 +154,11 @@ void timer_init ( void )
 }
 ```
 
-1行目で現在のカウンタ値を読み込み、2行目でカウンタ値を増加させ、3行目で
-割り込み番号1のコンペアレジスタの値を設定しています。`interval`値を操作する
-ことで、最初のタイマ割り込みがどのくらいで発生するかを調整できます。
+The first line reads current counter value, the second line increases it and the third line sets the value of the compare register for the interrupt number 1. By manipulating `interval` value you can adjust how soon the first timer interrupt will be generated.
 
-### タイマ割り込みを処理する
+### Handing timer interrupts
 
-ようやくタイマ割り込みハンドラにたどり着きました。実は非常にシンプルです。
+Finally, we got to the timer interrupt handler. It is actually very simple.
 
 ```
 void handle_timer_irq( void )
@@ -308,23 +170,16 @@ void handle_timer_irq( void )
 }
 ```
 
-ここではまず、同じ時間間隔で次の割り込みが発生するようにコンペアレジスタを
-更新します。次に、`TIMER_CS`レジスタに1を書き込むことで割り込みの発生を確認
-します。マニュアルでは`TIMER_CS`は「タイマ制御/状態(Timer Control/Status)」
-レジスタと呼ばれています。このレジスタのビット[0:3]は、4つの利用可能な割り込み
-ラインの1つから来る割り込みを確認するために使用できます。
+Here we first update compare register so that that next interrupt will be generated after the same time interval. Next, we acknowledge the interrupt by writing 1 to the `TIMER_CS` register. In the documentation `TIMER_CS` is called "Timer Control/Status" register. Bits [0:3] of this register can be used to acknowledge interrupts coming from one of the 4 available interrupt lines.
 
-### 結論
+### Conclusion
 
-最後に見るべきものは、これまでに説明したすべての機能をまとめている[kernel_main](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/kernel.c#L7)関数
-です。このサンプルをコンパイルして実行すると、割り込みが入ると"Timer interrupt received"と
-いうメッセージが表示されるはずです。是非、自分でやってみてください。そして、コードを
-よく吟味して、実験することを忘れないでください。
+The last thing that you might want to take a look at is the [kernel_main](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/kernel.c#L7) function where all previously discussed functionality is orchestrated. After you compile and run the sample it should print "Timer interrupt received" message after an interrupt is taken. Please, try to do it by yourself and don't forget to carefully examine the code and experiment with it.
 
-##### 前ページ
+##### Previous Page
 
-2.3 [プロセッサの初期化: 演習](../../docs/lesson02/exercises.md)
+2.3 [Processor initialization: Exercises](../../docs/lesson02/exercises.md)
 
-##### 次ページ
+##### Next Page
 
-3.2 [割り込み処理: Linuxにおける低レベル割り込み処理](../../docs/lesson03/linux/low_level-exception_handling.md)
+3.2 [Interrupt handling: Low-level exception handling in Linux](../../docs/lesson03/linux/low_level-exception_handling.md)

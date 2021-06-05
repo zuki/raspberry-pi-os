@@ -1,48 +1,28 @@
-## 1.1: RPi OSの導入、ベアメタルで"Hello, World!"
+## 1.1: Introducing RPi OS, or bare-metal "Hello, World!"
 
-小さなベアメタルの"Hello, World"アプリケーションを書くことにより、OS開発の旅を始めようと
-思います。すでに、[前提条件](../Prerequisites.md)に目を通し、すべての準備ができている
-と思います。もしそうでなければ、今すぐしてください。
+We are going to start our journey in OS development by writing a small, bare-metal "Hello, World" application. I assume that  you have gone through the [Prerequisites](../Prerequisites.md) and have everything ready. If not, now is the time to do this.
 
-先に進む前に、簡単な命名規約を定めたいと思います。READMEファイルを見るとチュートリアル
-全体が複数のレッスンに分かれていることがわかるでしょう。各レッスンは、私が「チャプタ」と
-呼ぶ個々のファイルで構成されています（今あなたが読んでいるのはレッスン1のチャプタ1.1です）。
-チャプタはさらに見出しを持つ「セクション」に分かれています。この命名規約により、この
-チュートリアルの様々な部分を参照することができます。
+Before we move forward, I want to establish a simple naming convention. From the README file you can see that the whole tutorial is divided into lessons. Each lesson consists of individual files that I call "chapters" (right now, you are reading lesson 1, chapter 1.1). A chapter is further divided into "sections" with headings. This naming convention allows me to make references to different parts of the material.
 
-もうひとつ注目していただきたいのはこのチュートリアルにはソースコードのサンプルが数多く
-含まれていることです。通常、私は完全なコードブロックを提供することで説明を始め、次に、
-それを一行ずつ説明していきます。
+Another thing I want you to pay attention to is that the tutorial contains a lot of source code samples. I'll usually start the explanation by providing the complete code block, and then describe it line by line. 
 
-### プロジェクトの構成
+### Project structure
 
-各レッスンのソースコードは同じ構成になっています。このレッスンのソースコードは
-[ここ](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src/lesson01)にあります。
-このフォルダの主な構成要素を簡単に説明しましょう。
-
-1. **Makefile** カーネルのビルドには[make](http://www.math.tau.ac.il/~danha/courses/software1/make-intro.html)ユーティリティーを
-   使用します。`make`の動作はMakefileで構成されます。Makefileにはソースコードをコンパイル・
-   リンクする方法に関する命令が書かれています。
-2. **build.sh または build.bat** これらのファイルはDockerを使ってカーネルをビルドする場合に
-   必要です。Dockerを使うとラップトップにmakeユーティリティーやコンパイラツールチェーンを
-   インストールする必要がありません。
-3. **src** すべてのソースコードを含むフォルダです。
-4. **include** すべてのヘッダーファイルはここに置かれます。
+The source code of each lesson has the same structure. You can find this lesson's source code [here](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src/lesson01). Let's briefly describe the main components of this folder:
+1. **Makefile** We will use the [make](http://www.math.tau.ac.il/~danha/courses/software1/make-intro.html) utility to build the kernel. `make`'s behavior is configured by a Makefile, which contains instructions on how to compile and link the source code. 
+1. **build.sh or build.bat** You'll need these files if you want to build the kernel using Docker. You won't need to have the make utility or the compiler toolchain installed on your laptop.
+1. **src** This folder contains all of the source code.
+1. **include** All of the header files are placed here. 
 
 ### Makefile
 
-では、プロジェクトのMakefileを詳しく見てみましょう。makeユーティリティーの主な目的は
-プログラムのどの部分を再コンパイルする必要があるかを自動的に判断し、それらを再コンパイル
-するためのコマンドを発行することです。makeやMakefileについてよく知らない人は
-[この記事](http://opensourceforu.com/2012/06/gnu-make-in-detail-for-beginners/) を読むことを
-お勧めします。第1回目のレッスンで使用するMakefileは[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/Makefile)に
-あります。Makefileの全体を以下に示します。
-
+Now let's take a closer look at the project Makefile. The primary purpose of the make utility is to automatically determine what pieces of a program need to be recompiled, and to issue commands to recompile them. If you are not familiar with make and Makefiles, I recommend that you read [this](http://opensourceforu.com/2012/06/gnu-make-in-detail-for-beginners/) article. 
+The Makefile used in the first lesson can be found [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/Makefile). The whole Makefile is listed below:
 ```
 ARMGNU ?= aarch64-linux-gnu
 
 COPS = -Wall -nostdlib -nostartfiles -ffreestanding -Iinclude -mgeneral-regs-only
-ASMOPS = -Iinclude
+ASMOPS = -Iinclude 
 
 BUILD_DIR = build
 SRC_DIR = src
@@ -50,7 +30,7 @@ SRC_DIR = src
 all : kernel8.img
 
 clean :
-    rm -rf $(BUILD_DIR) *.img
+    rm -rf $(BUILD_DIR) *.img 
 
 $(BUILD_DIR)/%_c.o: $(SRC_DIR)/%.c
     mkdir -p $(@D)
@@ -70,65 +50,43 @@ DEP_FILES = $(OBJ_FILES:%.o=%.d)
 kernel8.img: $(SRC_DIR)/linker.ld $(OBJ_FILES)
     $(ARMGNU)-ld -T $(SRC_DIR)/linker.ld -o $(BUILD_DIR)/kernel8.elf  $(OBJ_FILES)
     $(ARMGNU)-objcopy $(BUILD_DIR)/kernel8.elf -O binary kernel8.img
-```
-
-では、このファイルを詳しく見てみましょう。
-
+``` 
+Now, let's inspect this file in detail:
 ```
 ARMGNU ?= aarch64-linux-gnu
 ```
-
-Makefileは変数の定義から始まります。`ARMGNU`はクロスコンパイラ用の接頭辞です。
-私達は`arm64`アーキテクチャ用のソースコードを`x86`マシンでコンパイルするので
-[クロスコンパイラ](https://en.wikipedia.org/wiki/Cross_compiler)を使う必要が
-あります。そのため、`gcc`ではなく`aarch64-linux-gnu-gcc`を使用します。
+The Makefile starts with a variable definition. `ARMGNU` is a cross-compiler prefix. We need to use a [cross-compiler](https://en.wikipedia.org/wiki/Cross_compiler) because we are compiling the source code for the `arm64` architecture on an `x86` machine. So instead of `gcc`, we will use `aarch64-linux-gnu-gcc`. 
 
 ```
 COPS = -Wall -nostdlib -nostartfiles -ffreestanding -Iinclude -mgeneral-regs-only
-ASMOPS = -Iinclude
+ASMOPS = -Iinclude 
 ```
 
-`COPS`と`ASMOPS`は各々Cコードとアセンブラコードをコンパイルする際にコンパイラに渡す
-オプションです。これらのオプションについて簡単な説明が必要でしょう。
+`COPS` and `ASMOPS` are options that we pass to the compiler when compiling C and assembler code, respectively. These options require a short explanation:
 
-* **-Wall** すべてのワーニングを表示する。
-* **-nostdlib** C標準ライブラリを使用しない。C標準ライブラリの呼び出しのほとんどは
-  最終的にオペレーティングシステムと相互作用します。私たちはベアメタルのプログラムを
-  書いており、基盤となるオペレーティングシステムを持っていないので、C標準ライブラリは
-  ここでは機能しません。
-* **-nostartfiles** 標準スタートアップファイルを使用しない。スタートアップファイルは
-  初期スタックポインタの設定、静的データの初期化、メインエントリポイントへのジャンプ
-  などを行います。私たちはこのすべてを自分で行うことになります。
-* **-ffreestanding** フリースタンディング環境とは、標準ライブラリが存在せず、プログラムの
-  スタートアップが必ずしもmain関数であるとは限らない環境のことです。`-ffreestanding`
-  オプションは標準関数が通常の定義を持っていることを前提としないようにコンパイラに
-  指示します。
-* **-Iinclude** ヘッダファイルを`include`フォルダで探すようにします。
-* **-mgeneral-regs-only**. 汎用レジスタのみを使用する。ARMプロセッサは[NEON](https://developer.arm.com/technologies/neon)
-  レジスタも持っていますが、（たとえば、コンテキストスイッチの際にレジスタを保存する
-  必要があるので）複雑性を増すNEONをコンパイラに使ってほしくないからです。
+* **-Wall** Show all warnings.
+* **-nostdlib** Don't use the C standard library. Most of the calls in the C standard library eventually interact with the operating system. We are writing a bare-metal program, and we don't have any underlying operating system, so the C standard library is not going to work for us anyway.
+* **-nostartfiles** Don't use standard startup files. Startup files are responsible for setting an initial stack pointer, initializing static data, and jumping to the main entry point. We are going to do all of this by ourselves.
+* **-ffreestanding** A freestanding environment is an environment in which the standard library may not exist, and program startup may not necessarily be at main. The option `-ffreestanding` directs the compiler to not assume that standard functions have their usual definition.
+* **-Iinclude** Search for header files in the `include` folder.
+* **-mgeneral-regs-only**. Use only general-purpose registers. ARM processors also have [NEON](https://developer.arm.com/technologies/neon) registers. We don't want the compiler to use them because they add additional complexity (since, for example, we will need to store the registers during a context switch).
 
 ```
 BUILD_DIR = build
 SRC_DIR = src
 ```
 
-`SRC_DIR`と`BUILD_DIR`は各々、ソースコードとコンパイル済のオブジェクトファイルを格納する
-ディレクトリです。
+`SRC_DIR` and `BUILD_DIR` are directories that contain source code and compiled object files, respectively.
 
 ```
 all : kernel8.img
 
 clean :
-    rm -rf $(BUILD_DIR) *.img
+    rm -rf $(BUILD_DIR) *.img 
 ```
 
-次に、makeのターゲットを定義します。最初の2つのターゲットは非常にシンプルです。`all`
-ターゲットはデフォルトターゲットであり、引数なしで`make`と入力した場合はこのターゲットが
-実行されます（`make`は常に最初のターゲットをデフォルトとして使用します）。このターゲットは、
-すべての作業を別のターゲットである`kernel8.img`にリダイレクトするだけです。`clean`
-ターゲットはすべてのコンパイル成果物とコンパイルされたカーネルイメージを削除する役割を
-果たします。
+Next, we define make targets. The first two targets are pretty simple: the `all` target is the default one, and it is executed whenever you type `make` without any arguments (`make` always uses the first target as the default). This target just redirects all work to a different target, `kernel8.img`. 
+The `clean` target is responsible for deleting all compilation artifacts and the compiled kernel image.
 
 ```
 $(BUILD_DIR)/%_c.o: $(SRC_DIR)/%.c
@@ -139,11 +97,7 @@ $(BUILD_DIR)/%_s.o: $(SRC_DIR)/%.S
     $(ARMGNU)-gcc $(ASMOPS) -MMD -c $< -o $@
 ```
 
-次の2つのターゲットは、Cファイルとアセンブラファイルのコンパイルを担当します。たとえば、
-`src`ディレクトリに`foo.c`と`foo.S`がある場合、それぞれ`build/foo_c.o`と`build/foo_s.o`に
-コンパイルされます。`$<`と`$@`は実行時に入力ファイル名と出力ファイル名（`foo.c`と`foo_c.o`）に
-置き換えられます。また、Cファイルをコンパイルする前に、まだ存在しない場合に備えて`build`
-ディレクトリを作成します。
+The next two targets are responsible for compiling C and assembler files. If, for example, in the `src` directory we have `foo.c` and `foo.S` files, they will be compiled into `build/foo_c.o` and `build/foo_s.o`, respectively. `$<` and `$@` are substituted at runtime with the input and output filenames (`foo.c` and `foo_c.o`). Before compiling C files, we also create a `build` directory in case it doesn't exist yet.
 
 ```
 C_FILES = $(wildcard $(SRC_DIR)/*.c)
@@ -152,52 +106,31 @@ OBJ_FILES = $(C_FILES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%_c.o)
 OBJ_FILES += $(ASM_FILES:$(SRC_DIR)/%.S=$(BUILD_DIR)/%_s.o)
 ```
 
-ここでは、Cとアセンブラのソースファイルを連結して作成されるすべてのオブジェクトファイル
-（`OBJ_FILES`）の配列を構築しています（[置換参照](https://www.gnu.org/software/make/manual/html_node/Substitution-Refs.html)を参照）。
-
+Here we are building an array of all object files (`OBJ_FILES`) created from the concatenation of both C and assembler source files (see [Substitution References](https://www.gnu.org/software/make/manual/html_node/Substitution-Refs.html)).
 
 ```
 DEP_FILES = $(OBJ_FILES:%.o=%.d)
 -include $(DEP_FILES)
 ```
 
-次の2行は少し注意が必要です。Cとアセンブラのソースファイルのコンパイルターゲットを定義した
-方法を見てみると`-MMD`パラメータを使用していることに気づくでしょう。このパラメータは、
-生成されるオブジェクトファイルごとに依存関係ファイルを作成するよう`gcc`コンパイラに指示します。
-依存関係ファイルとは、特定のソースファイルに関するすべての依存関係を定義するものです。通常、
-これらの依存関係にはインクルードされるすべてのヘッダーのリストが含まれています。ヘッダが
-変更された場合にmakeが再コンパイルする内容を正確に知ることができるように、生成されたすべての
-依存関係ファイルをインクルードする必要があります。
+The next two lines are a little bit tricky. If you take a look at how we defined our compilation targets for both C and assembler source files, you will notice that we used the `-MMD` parameter. This parameter instructs the `gcc` compiler to create a dependency file for each generated object file. A dependency file defines all of the dependencies for a particular source file. These dependencies usually contain a list of all included headers. We need to include all of the generated dependency files so that make knows what exactly to recompile in case a header changes. 
 
 ```
 $(ARMGNU)-ld -T $(SRC_DIR)/linker.ld -o kernel8.elf  $(OBJ_FILES)
-```
+``` 
 
-`OBJ_FILES`配列を使用して`kernel8.elf`ファイルを構築します。リンカスクリプト`src/linker.ld`を
-使用して生成される実行イメージの基本的なレイアウトを定義します（リンカスクリプトについては
-次節で説明します）。
+We use the `OBJ_FILES` array to build the `kernel8.elf` file. We use the linker script `src/linker.ld` to define the basic layout of the resulting executable image (we will discuss the linker script in the next section).
 
 ```
 $(ARMGNU)-objcopy kernel8.elf -O binary kernel8.img
 ```
 
-`kernel8.elf`は[ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
-フォーマットです。問題はELFファイルはオペレーティングシステムで実行されるように
-設計されていることです。ベアメタルプログラムを書くには、ELFファイルから実行ファイルと
-データセクションをすべて抜き出して`kernel8.img`イメージに入れる必要があります。
-ファイル名の最後の`8`は64ビットアーキテクチャであるARMv8を示しています。このファイル名は
-ファームウェアにプロセッサを64ビットモードで起動するよう指示します。`config.txt`
-ファイルに`arm_control=0x200`と設定することによりCPUを64ビットモードで起動することも
-できます。RPi OSは以前にこの方法を採用しており、今でも練習問題の解答の中にはこの方法が
-出てくることがあります。しかし、`arm_control`フラグは文書化されておらず、`kernel8.img`
-とういう命名規約を使用する方が望ましいです。
+`kernel8.elf` is in the [ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format) format. The problem is that ELF files are designed to be executed by an operating system. To write a bare-metal program, we need to extract all executable and data sections from the ELF file and put them into the `kernel8.img` image. The trailing `8` denotes ARMv8 which is a 64-bit architecture. This filename tells the firmware to boot the processor into 64-bit mode.
+You can also boot the CPU in the 64-bit mode by using `arm_control=0x200` flag in the `config.txt` file. The RPi OS previously used this method, and you can still find it in some of the exercise answers. However, `arm_control` flag is undocumented and it is preferable to use `kernel8.img` naming convention instead.
 
-### リンカスクリプト
+### The linker script
 
-リンカスクリプトの第一の目的は、入力オブジェクトファイル(`_c.o`と`_s.o`)の各セクションを
-出力ファイル(`.elf`)にどのようにマッピングするかを記述することです。リンカスクリプトに
-関する詳細は[こちら](https://sourceware.org/binutils/docs/ld/Scripts.html#Scripts)を
-ご覧ください。それでは、RPi OSのリンカスクリプトを見てみましょう。
+The primary purpose of the linker script is to describe how the sections in the input object files (`_c.o` and `_s.o`) should be mapped into the output file (`.elf`). More information about linker scripts can be found [here](https://sourceware.org/binutils/docs/ld/Scripts.html#Scripts). Now let's take a look at the RPi OS linker script:
 
 ```
 SECTIONS
@@ -208,29 +141,18 @@ SECTIONS
     .data : { *(.data) }
     . = ALIGN(0x8);
     bss_begin = .;
-    .bss : { *(.bss*) }
+    .bss : { *(.bss*) } 
     bss_end = .;
 }
-```
+``` 
 
-Raspberry Piは起動後、`kernel8.img`をメモリにロードし、ファイルの先頭から実行を開始します。
-そのため、`.text.boot`セクションが最初になければなりません。このセクションの中にOSの
-スタートアップコードを入れることになります。`.text`, `.rodata`, `.data`の各セクションには
-コンパイルされたカーネル命令、読み取り専用データ、通常のデータがそれぞれ格納されます。
-これらについては特に説明することはありません。`.bss`セクションには、0に初期化する必要の
-あるデータが格納されます。このようなデータを別のセクションに格納することでコンパイラは
-ELFバイナリのサイズを削減することができます（ELFヘッダにはセクションサイズだけが格納され、
-セクション自体は格納されません）。イメージをメモリにロードした後に`.bss`セクションを0に
-初期化する必要があります。セクションの開始アドレスと終了アドレス（`bss_begin`と`bss_end`
-シンボル）を記録しなければならないのはそのためです。また、セクションが8の倍数のアドレス
-から始まるようにアラインする必要があります。セクションがアラインされていないと`str`命令を
-使用して`bss`セクションの先頭に0を格納することが難しくなります。`str`命令は8バイト
-アラインのアドレスでしか使用できないからです。
+After startup, the Raspberry Pi loads `kernel8.img` into memory and starts execution from the beginning of the file. That's why the `.text.boot` section must be first; we are going to put the OS startup code inside this section. 
+The `.text`, `.rodata`, and `.data` sections contain kernel-compiled instructions, read-only data, and normal data––there is nothing special to add about them.
+The `.bss` section contains data that should be initialized to 0. By putting such data in a separate section, the compiler can save some space in the ELF binary––only the section size is stored in the ELF header, but the section itself is omitted. After loading the image into memory, we must initialize the `.bss` section to 0; that's why we need to record the start and end of the section (hence the `bss_begin` and `bss_end` symbols) and align the section so that it starts at an address that is a multiple of 8. If the section is not aligned, it would be more difficult to use the `str` instruction to store 0 at the beginning of the `bss` section because the `str` instruction can be used only with 8-byte-aligned addresses.
 
-### カーネルを起動する
+### Booting the kernel
 
-ようやく[boot.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/boot.S)ファイルを
-見る番なりました。このファイルにはカーネルの起動コードが含まれています。
+Now it is time to take a look at the [boot.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/boot.S) file. This file contains the kernel startup code:
 
 ```
 #include "mm.h"
@@ -239,12 +161,12 @@ ELFバイナリのサイズを削減することができます（ELFヘッダ�
 
 .globl _start
 _start:
-    mrs    x0, mpidr_el1
-    and    x0, x0,#0xFF        // プロセッサidをチェック
-    cbz    x0, master          // プライマリCPU以外をハングアップ
+    mrs    x0, mpidr_el1        
+    and    x0, x0,#0xFF        // Check processor id
+    cbz    x0, master        // Hang for all non-primary CPU
     b    proc_hang
 
-proc_hang:
+proc_hang: 
     b proc_hang
 
 master:
@@ -256,32 +178,22 @@ master:
     mov    sp, #LOW_MEMORY
     bl    kernel_main
 ```
-
-では、このファイルを詳しく見ていきましょう。
+Let's review this file in detail:
 ```
 .section ".text.boot"
 ```
-
-まず、`boot.S`で定義するすべてのものを`.text.boot`セクションに入れるように指定します。
-前節でこのセクションがリンカスクリプトによってカーネルイメージの先頭に置かれることを
-説明しました。そのため、カーネルが起動されると`start`関数から実行が始まります。
-
+First, we specify that everything defined in `boot.S` should go in the `.text.boot` section. Previously, we saw that this section is placed at the beginning of the kernel image by the linker script. So when the kernel is started, execution begins at the `start` function:
 ```
 .globl _start
 _start:
-    mrs    x0, mpidr_el1
-    and    x0, x0,#0xFF        // プロセッサidをチェック
-    cbz    x0, master          // プライマリCPU以外をハングアップ
+    mrs    x0, mpidr_el1        
+    and    x0, x0,#0xFF        // Check processor id
+    cbz    x0, master        // Hang for all non-primary CPU
     b    proc_hang
 ```
 
-この関数が最初に行うことはプロセッサIDのチェックです。Raspberry Pi 3には4つのコア
-プロセッサが搭載されています。デバイスの電源を入れると各コアが同一のコードの実行を
-開始します。しかし、4つのコアを動作させたくはありません。最初のコアだけを動作させ、
-他のコアはすべて無限ループにしたいのです。`_start`関数が担当しているのがまさにこれです。
-この関数は[mpidr_el1](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0500g/BABHBJCI.html)
-システムレジスタからプロセッサIDを取得します。現在のプロセスIDが0であれば実行を
-`master`関数に移します。
+The first thing this function does is check the processor ID. The Raspberry Pi 3 has four core processors, and after the device is powered on, each core begins to execute the same code. However, we don't want to work with four cores; we want to work only with the first one and put all of the other cores in an endless loop. This is exactly what the `_start` function is responsible for. It gets the processor ID from the [mpidr_el1](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0500g/BABHBJCI.html) system register. 
+If the current process ID is 0, then execution is transferred to the `master` function:
 
 ```
 master:
@@ -291,54 +203,31 @@ master:
     bl     memzero
 ```
 
-ここでは`memzero`を呼び出して`.bss`セクションをゼロクリアします。この関数の定義は後で
-行います。ARMv8アーキテクチャでは、慣習的に、最初の7つの引数はレジスタx0-x6を介して
-呼び出された関数に渡されます。`memzero`関数は引数を2つだけ受け付けます。開始アドレス
-（`bss_begin`）とゼロクリアが必要なセクションのサイズ（`bss_end - bss_begin`）です。
+Here, we clean the `.bss` section by calling `memzero`. We will define this function later. In ARMv8 architecture, by convention, the first seven arguments are passed to the called function via registers x0–x6. The `memzero` function accepts only two arguments: the start address (`bss_begin`) and the size of the section needed to be cleaned (`bss_end - bss_begin`).
 
 ```
     mov    sp, #LOW_MEMORY
     bl    kernel_main
 ```
 
-`.bss`セクションをゼロクリアした後はスタックポインタを初期化し、`kernel_main`関数に
-実行を渡します。Raspberry Piはカーネルをアドレス0にロードします。そのため、初期の
-スタックポインタは十分に高い任意の位置に設定することができ、カーネルイメージが十分に
-大きくなってもスタックが上書きされることはありません。`LOW_MEMORY`は[mm.h](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/include/mm.h) で
-定義されており、4MBに相当します。私たちのカーネルのスタックはそれほど大きくならず、
-イメージ自体も小さいので、4MBで十分です。
+After cleaning the `.bss` section, we initialize the stack pointer and pass execution to the `kernel_main` function. The Raspberry Pi loads the kernel at address 0; that's why the initial stack pointer can be set to any location high enough so that stack will not override the kernel image when it grows sufficiently large. `LOW_MEMORY` is defined in [mm.h](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/include/mm.h) and is equal to 4MB. Our kernel's stack won't grow very large and the image itself is tiny, so `4MB` is more than enough for us. 
 
-ARMのアセンブラ文法に詳しくない方のために、今回使用した命令を簡単にまとめておきます。
+For those of you who are not familiar with ARM assembler syntax, let me quickly summarize the instructions that we have used:
 
-* [**mrs**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289881374.htm)
-  システムレジスタの値を汎用レジスタ(x0–x30)にロードします。
-* [**and**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289863017.htm)
-  論理AND操作を行います。ここでは`mpidr_el1`レジスタから取得したあたりから最後の
-  1バイトを取り出すためにこの命令を使用しています。
-* [**cbz**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289867296.htm)
-  1つ前に実行した操作の結果と0を比べて、その結果が真の場合、指定したラベルにジャンプ
-  （ARMの用語に従えば`branch（分岐）`します。
-* [**b**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289863797.htm)
-  指定のラベルに無条件分岐します。
-* [**adr**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289862147.htm)
-  ラベルの相対アドレスをターゲットレジスタにロードします。ここでは`.bss`セクションの
-  開始アドレスと終了アドレスへのポインタを求めています。
-* [**sub**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289908389.htm)
-  2つのレジスタの値の差を取ります。
-* [**bl**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289865686.htm)
-  「リンクありの分岐」: 無条件分岐を行い、復帰アドレスをx30（リンクレジスタ）に格納
-  します。サブルーチンが終わったら、`ret`命令を使って復帰アドレスにジャンプします。
-* [**mov**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289878994.htm)
-  レジスタ間で値を、または定数をレジスタに移動します。
+* [**mrs**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289881374.htm) Load value from a system register to one of the general purpose registers (x0–x30)
+* [**and**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289863017.htm) Perform the logical AND operation. We use this command to strip the last byte from the value we obtain from the `mpidr_el1` register.
+* [**cbz**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289867296.htm) Compare the result of the previously executed operation to 0 and jump (or `branch` in ARM terminology) to the provided label if the comparison yields true.
+* [**b**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289863797.htm) Perform an unconditional branch to some label.
+* [**adr**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289862147.htm) Load a label's relative address into the target register. In this case, we want pointers to the start and end of the `.bss` region.
+* [**sub**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289908389.htm) Subtract values from two registers.
+* [**bl**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289865686.htm) "Branch with a link": perform an unconditional branch and store the return address in x30 (the link register). When the subroutine is finished, use the `ret` instruction to jump back to the return address.
+* [**mov**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289878994.htm) Move a value between registers or from a constant to a register.
 
-ARMv8-A開発者ガイドが[ここ](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/index.html)にあります。
-これはARM ISAに馴染みのない方には良い資料です。[このページ](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/ch09s01s01.html)ではABIにおけるレジスタ使用規則が具体的に
-説明されています。
+[Here](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/index.html) is the ARMv8-A developer's guide. It's a good resource if the ARM ISA is unfamiliar to you. [This page](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/ch09s01s01.html) specifically outlines the register usage convention in the ABI.
 
-### `kernel_main`関数
+### The `kernel_main` function
 
-ブートコードは最終的に`kernel_main`関数に制御を渡すことを見てきました。それを見て
-みましょう。
+We have seen that the boot code eventually passes control to the `kernel_main` function. Let's take a look at it:
 
 ```
 #include "mini_uart.h"
@@ -355,56 +244,29 @@ void kernel_main(void)
 
 ```
 
-この関数はカーネルの中で最もシンプルな関数の1つです。この関数は`Mini UART`デバイスを使って
-画面に表示し、ユーザーの入力を読み取ります。カーネルは`Hello, world!`と表示した後、ユーザ
-から文字を読み取って画面に送り返す無限ループに入ります。
+This function is one of the simplest in the kernel. It works with the `Mini UART` device to print to screen and read user input. The kernel just prints `Hello, world!` and then enters an infinite loop that reads characters from the user and sends them back to the screen.
 
-### Raspberry Piデバイス
+### Raspberry Pi devices 
 
-ここからは、Raspberry Pi固有の内容を掘り下げていきます。その前に[BCM2837 ARMペリフェラルマニュアル](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf)を
-ダウンロードすることをお勧めします。BCM2837は、Raspberry Pi 3 Model BとB+で使用されている
-ボードです。説明の中ではBCM2835とBCM2836にも言及することがあるかもしれません。これらは古い
-Raspberry Piで使用されていたボードの名前です。
+Now we are going to dig into something specific to the Raspberry Pi. Before we begin, I recommend that you download the [BCM2837 ARM Peripherals manual](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf). BCM2837 is a board that is used by the Raspberry Pi 3 Models B, and B+. Sometime in our discussion, I will also mention BCM2835 and BCM2836 - those are names of the board used in older versions of the Raspberry Pi.  
 
-実装の詳細を説明する前に、メモリマップドデバイスを扱う上での基本的な概念を説明します。
-BCM2837はシンプルな[SOC (System on a chip)](https://en.wikipedia.org/wiki/System_on_a_chip)
-ボードです。このようなボードではすべてのデバイスにメモリマップドレジスタを介してアクセス
-します。Raspberry Pi 3はアドレス`0x3F000000`以上のメモリをデバイス用に予約しています。
-特定のデバイスの起動や設定を行うには、そのデバイスのレジスタのいずれかに何らかのデータを
-書き込む必要があります。デバイスレジスタは32ビットのメモリ領域に過ぎません。各デバイス
-レジスタの各ビットの意味は「BCM2837 ARMペリフェラルマニュアル」に記載されています。
-（マニュアルでは`0x7E000000`が使用されているにも関わらず）`0x3F000000`をベースアドレスと
-して使用している理由については、マニュアルの「1.2.3 ARM物理アドレス」とその周辺
-ドキュメントを参照してください。
+Before we proceed to the implementation details, I want to share some basic concepts on how to work with memory-mapped devices. BCM2837 is a simple [SOC (System on a chip)](https://en.wikipedia.org/wiki/System_on_a_chip) board. In such a board, access to all devices is performed via memory-mapped registers. The Raspberry Pi 3 reserves the memory above address `0x3F000000` for devices. To activate or configure a particular device, you need to write some data in one of the device's registers. A device register is just a 32-bit region of memory. The meaning of each bit in each device register is described in the `BCM2837 ARM Peripherals` manual. Take a look at section 1.2.3 ARM physical addresses in the manual and the surrounding documentation for more context on why we use `0x3F000000` as a base address (even though `0x7E000000` is used throughout the manual).
 
-`kernel_main`関数から`Mini UART`デバイスを使用しようとしていることが推測できるでしょう。
-UARTとは[Universal asynchronous receiver-transmitter](https://en.wikipedia.org/wiki/Universal_asynchronous_receiver-transmitter)の
-略です。このデバイスは、メモリマップされたレジスタの1つに格納されている値を電圧の高低の
-シーケンスに変換することができます。このシーケンスは`TTLシリアルケーブル`を介して
-コンピュータに渡され、ターミナルエミュレータによって解釈されます。ここではRaspberry Pi
-との通信を容易にするためにMini UARTを使用します。Mini UARTのレジスタの仕様を確認したい
-場合は「BCM2837 ARMペリフェラルマニュアル」の8ページを参照してださい。
+From the `kernel_main` function, you can guess that we are going to work with a Mini UART device. UART stands for [Universal asynchronous receiver-transmitter](https://en.wikipedia.org/wiki/Universal_asynchronous_receiver-transmitter). This device is capable of converting values stored in one of its memory mapped registers to a sequence of high and low voltages. This sequence is passed to your computer via the `TTL-to-serial cable` and is interpreted by your terminal emulator. We are going to use the Mini UART to facilitate communication with our Raspberry Pi. If you want to see the specification of the Mini UART registers, please go to page 8 of the `BCM2837 ARM Peripherals` manual. 
 
-Raspberry Piには2つのUARTがあります。Mini UARTとPL011 UARTです。このチュートリアルでは
-よりシンプルな1つ目のUARTだけを使用します。しかし、PL011 UARTの扱い方を示すオプションの
-[練習問題](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/docs/lesson01/exercises.md)があります。
-Raspberry PiのUARTについてもっと詳しく知りたい方や2つのUARTの違いを知りたい方は[公式どきゅ](https://www.raspberrypi.org/documentation/configuration/uart.md)を参照してください。
+A Raspberry Pi has two UARTs: Mini UART and PL011 UART. In this tutorial, we are going to work only with the first one, because it is simpler. There is, however, an optional [exercise](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/docs/lesson01/exercises.md) that shows how to work with PL011 UART. You can refer to the [official documentation](https://www.raspberrypi.org/documentation/configuration/uart.md) if you want to find out more about Raspberry Pi UARTs and learn the difference between them.
 
-もう1つ慣れておく必要のあるデバイスはGPIO [汎用入出力（General-purpose input/output）](https://en.wikipedia.org/wiki/General-purpose_input/output)です。GPIOはGPIOピンを制御する役割を
-担っています。下の画像を見ればすぐにわかるはずです。
+Another device that you need to familiarize yourself with is the GPIO [General-purpose input/output](https://en.wikipedia.org/wiki/General-purpose_input/output). GPIOs are responsible for controlling `GPIO pins`. You should be able to easily recognize them in the image below:
 
 ![Raspberry Pi GPIO pins](../../images/gpio-pins.jpg)
 
-GPIOは各GPIOピンの動作を構成するために使用できます。たとえば、Mini UARTを使えるように
-するには、ピン14と15をアクティブにして、このデバイスを使えるように設定する必要があります。
-下の画像はGPIOピンの番号がどのように割り当てられているのかを示しています。
+The GPIO can be used to configure the behavior of different GPIO pins. For example, to be able to use the Mini UART, we need to activate pins 14 and 15 and set them up to use this device. The image below illustrates how numbers are assigned to the GPIO pins:
 
 ![Raspberry Pi GPIO pin numbers](../../images/gpio-numbers.png)
 
-### Mini UARTの初期化
+### Mini UART initialization
 
-では、mini UARTがどのように初期化されるかを見てみましょう。このコードは [mini_uart.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/mini_uart.c)で
-定義されています。
+Now let's take a look at how mini UART is initialized. This code is defined in [mini_uart.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/mini_uart.c):
 
 ```
 void uart_init ( void )
@@ -412,10 +274,10 @@ void uart_init ( void )
     unsigned int selector;
 
     selector = get32(GPFSEL1);
-    selector &= ~(7<<12);                   // gpio14をクリーンアップ
-    selector |= 2<<12;                      // gpio14をalt5に設定
-    selector &= ~(7<<15);                   // gpio15をクリーンアップ
-    selector |= 2<<15;                      // gpio 15をalt5に設定
+    selector &= ~(7<<12);                   // clean gpio14
+    selector |= 2<<12;                      // set alt5 for gpio14
+    selector &= ~(7<<15);                   // clean gpio15
+    selector |= 2<<15;                      // set alt5 for gpio 15
     put32(GPFSEL1,selector);
 
     put32(GPPUD,0);
@@ -424,91 +286,67 @@ void uart_init ( void )
     delay(150);
     put32(GPPUDCLK0,0);
 
-    put32(AUX_ENABLES,1);                   // mini uartを有効にする（これはそのレジスタへのアクセスも有効にする）
-    put32(AUX_MU_CNTL_REG,0);               // 自動フロー制御、送受信機を無効にする（一時的に）
-    put32(AUX_MU_IER_REG,0);                // 送受信割り込みを無効にする
-    put32(AUX_MU_LCR_REG,3);                // 8ビットモードに設定する
-    put32(AUX_MU_MCR_REG,0);                // RTSラインを常にHighに設定する
-    put32(AUX_MU_BAUD_REG,270);             // 通信速度を115200に設定する
+    put32(AUX_ENABLES,1);                   //Enable mini uart (this also enables access to its registers)
+    put32(AUX_MU_CNTL_REG,0);               //Disable auto flow control and disable receiver and transmitter (for now)
+    put32(AUX_MU_IER_REG,0);                //Disable receive and transmit interrupts
+    put32(AUX_MU_LCR_REG,3);                //Enable 8 bit mode
+    put32(AUX_MU_MCR_REG,0);                //Set RTS line to be always high
+    put32(AUX_MU_BAUD_REG,270);             //Set baud rate to 115200
 
-    put32(AUX_MU_CNTL_REG,3);               // 最後に、送受信機を有効にする
+    put32(AUX_MU_CNTL_REG,3);               //Finally, enable transmitter and receiver
 }
-```
+``` 
 
-ここでは`put32`と`get32`という2つの関数を使います。これらの関数はきわめてシンプルであり、
-32ビットのレジスタとの間でデータを読み書きすることができます。それらがどのように実装されて
-いるかは[utils.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/utils.S)で見ることができます。
-`uart_init`はこのレッスンの中で最も複雑かつ重要な関数の1つです。以下の3つの節で検討していきます。
+Here, we use the two functions `put32` and `get32`. Those functions are very simple; they allow us to read and write some data to and from a 32-bit register. You can take a look at how they are implemented in [utils.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/utils.S). `uart_init` is one of the most complex and important functions in this lesson, and we will continue to examine it in the next three sections.
 
-#### GPIO代替機能の選択
+#### GPIO alternative function selection 
 
-まず、GPIOピンをアクティブにする必要があります。ほとんどのピンは様々なデバイスで使用
-できるので、特定のピンを使用する前にそのピンの`代替機能`を選択する必要があります。
-`代替機能`とは、各ピンに設定できる0から5までの数字のことであり、そのピンにどのデバイスを
-接続するかを設定します。下の図は利用可能なすべてのGPIO代替機能のリストです（図は
-「BCM2837 ARMペリフェラルマニュアル」の102ページから引用しました）。
+First, we need to activate the GPIO pins. Most of the pins can be used with different devices, so before using a particular pin, we need to select the pin's `alternative function`. An `alternative function` is just a number from 0 to 5 that can be set for each pin and configures which device is connected to the pin. You can see the list of all available GPIO alternative functions in the image below (the image is taken from page 102 of `BCM2837 ARM Peripherals` manual):
 
 ![Raspberry Pi GPIO alternative functions](../../images/alt.png?raw=true)
 
-ここでは、ピン14と15にTXD1とRXD1の代替機能が用意されていることがわかります。これは
-ピン14と15に代替機能番号5を選択すれば、それぞれMini UART送信データピンおよびMini UART
-受信データピンとして使用できることを意味します。`GPFSEL1`レジスタはピン10からピン19の
-代替機能の制御に使用されます。これらのレジスタのすべてのビットの意味は次の表に示されて
-います（「BCM2837 ARMペリフェラルマニュアル」の92ページ）。
+Here you can see that pins 14 and 15 have the TXD1 and RXD1 alternative functions available. This means that if we select alternative function number 5 for pins 14 and 15, they will be used as a Mini UART Transmit Data pin and Mini UART Receive Data pin, respectively. The `GPFSEL1` register is used to control alternative functions for pins 10-19. The meaning of all the bits in those registers is shown in the following table (page 92 of `BCM2837 ARM Peripherals` manual):
 
 ![Raspberry Pi GPIO function selector](../../images/gpfsel1.png?raw=true)
 
-これで、Mini UARTデバイスを使用できるようにGPIOピン14と15を設定するために使用される
-以下のコードを理解するために必要なことがすべてわかりました。
+So now you know everything you need to understand the following lines of code that are used to configure GPIO pins 14 and 15 to work with the Mini UART device:
 
 ```
     unsigned int selector;
 
     selector = get32(GPFSEL1);
-    selector &= ~(7<<12);                   // gpio14をクリーンアップ
-    selector |= 2<<12;                      // gpio14をalt5に設定
-    selector &= ~(7<<15);                   // gpio15をクリーンアップ
-    selector |= 2<<15;                      // gpio 15をalt5に設定
+    selector &= ~(7<<12);                   // clean gpio14
+    selector |= 2<<12;                      // set alt5 for gpio14
+    selector &= ~(7<<15);                   // clean gpio15
+    selector |= 2<<15;                      // set alt5 for gpio 15
     put32(GPFSEL1,selector);
 ```
 
-#### GPIOプルアップ/プルダウン
+#### GPIO pull-up/down 
 
-Raspberry PiのGPIOピンを扱っているとプルアップ/プルダウンといった用語をよく目に
-するようになります。これらの概念については[この記事](https://grantwinney.com/using-pullup-and-pulldown-resistors-on-the-raspberry-pi/)で詳しく説明されています。
-記事全体を読むのが面倒な方のためにプルアップ/プルダウンの概念を簡単に説明します。
+When you work with Raspberry Pi GPIO pins, you will often encounter terms such as pull-up/pull-down. These concepts are explained in great detail in [this](https://grantwinney.com/using-pullup-and-pulldown-resistors-on-the-raspberry-pi/) article. For those who are too lazy to read the whole article, I will briefly explain the pull-up/pull-down concept.
 
-あるピンを入力として使用していても、このピンに何も接続していないと、このピンの値が
-1なのか0なのかを識別することはできません。実際、デバイスはランダムな値を報告します。
-この問題を解決するのがプルアップ/プルダウン機構です。ピンをプルアップ状態に設定して、
-何も接続しなければ、常に`1`を報告します（プルダウン状態では、値は常に0です）。今回の
-ケースでは、14ピンと15ピンは共に常に接続されているため、プルアップ状態もプルダウン状態も
-必要ありません。ピンの状態は再起動後も保持されるのでピンを使用する前には必ずその状態を
-初期化する必要があります。設定可能な状態は、プルアップ、プルダウン、どちらでもない
-（現在のプルアップまたはプルダウンの状態を解除する）の3つで、ここでは3つ目の状態が
-必要です。
+If you use a particular pin as input and don't connect anything to this pin, you will not be able to identify whether the value of the pin is 1 or 0. In fact, the device will report random values. The pull-up/pull-down mechanism allows you to overcome this issue. If you set the pin to the pull-up state and nothing is connected to it, it will report `1` all the time (for the pull-down state, the value will always be 0). In our case, we need neither the pull-up nor the pull-down state, because both the 14 and 15 pins are going to be connected all the time. The pin state is preserved even after a reboot, so before using any pin, we always have to initialize its state. There are three available states: pull-up, pull-down, and neither (to remove the current pull-up or pull-down state), and we need the third one.
 
-ピンの状態を切り替えることはそれほど簡単なことではありません。電気回路上のスイッチを
-物理的に切り替える必要があるからです。このプロセスには`GPPUD`レジスタと`GPPUDCLK`
-レジスタが関与しており、B「BCM2837 ARMペリフェラルマニュアル」の101ページに記載されて
-います。その記述を以下にコピーしました。
+Switching between pin states is not a very simple procedure because it requires physically toggling a switch on the electric circuit. This process involves the `GPPUD` and `GPPUDCLK` registers and is described on page 101 of the `BCM2837 ARM Peripherals` manual. I copied the description here:
 
 ```
-GPIOプルアップ/プルダウンクロックレジスタはGPIOピンの内部プルダウン動作を制御します。
-GPIOのプルアップ/プルダウンを変更するには、これらのレジスタとGPPUDレジスタを連携させて
-使用する必要があります。次のような操作手順が必要です。
-1. 必要な制御信号を設定（プルアップ、プルダウン、または現在のプルアップ/ダウンを解除）
-   するためにGPPUDに書き込む。
-2. 150サイクル待つ。これは制御信号に必要なセットアップタイムを与える。
-3. 制御信号を変更したいGPIOパッドに入力するためにGPPUDCLK0/1に書き込む。
-   注意: クロックを受信したパッドのみが変更され、その他のパッドは以前の状態を維持する。
-4. 150サイクル待つ 。これは制御信号に必要なホールドタイムを与える。
-5. 制御信号を除去するためにGPPUDに書き込む。
-6. クロックを除去するためにGPPUDCLK0/1に書き込む。
-```
+The GPIO Pull-up/down Clock Registers control the actuation of internal pull-downs on
+the respective GPIO pins. These registers must be used in conjunction with the GPPUD
+register to effect GPIO Pull-up/down changes. The following sequence of events is
+required:
+1. Write to GPPUD to set the required control signal (i.e. Pull-up or Pull-Down or neither
+to remove the current Pull-up/down)
+2. Wait 150 cycles – this provides the required set-up time for the control signal
+3. Write to GPPUDCLK0/1 to clock the control signal into the GPIO pads you wish to
+modify – NOTE only the pads which receive a clock will be modified, all others will
+retain their previous state.
+4. Wait 150 cycles – this provides the required hold time for the control signal
+5. Write to GPPUD to remove the control signal
+6. Write to GPPUDCLK0/1 to remove the clock
+``` 
 
-この手順では、1つのピンからプルアップとプルダウン双方の状態を解除する方法を説明しています。
-これがピン14と15について次のコードで行っていることです。
+This procedure describes how we can remove both the pull-up and pull-down states from a pin, which is what we are doing for pins 14 and 15 in the following code:
 
 ```
     put32(GPPUD,0);
@@ -518,94 +356,70 @@ GPIOのプルアップ/プルダウンを変更するには、これらのレジ
     put32(GPPUDCLK0,0);
 ```
 
-#### Mini UARTの初期化
+#### Initializing the Mini UART
 
-これで、Mini UARTがGPIOピンに接続され、ピンが設定されました。`uart_init`関数の残りの部分は
-Mini UARTの初期化です。
-
-```
-    put32(AUX_ENABLES,1);                   // mini uartを有効にする（これはそのレジスタへのアクセスも有効にする）
-    put32(AUX_MU_CNTL_REG,0);               // 自動フロー制御、送受信機を無効にする（一時的に）
-    put32(AUX_MU_IER_REG,0);                // 送受信割り込みを無効にする
-    put32(AUX_MU_LCR_REG,3);                // 8ビットモードに設定する
-    put32(AUX_MU_MCR_REG,0);                // RTSラインを常にHighに設定する
-    put32(AUX_MU_BAUD_REG,270);             // 通信速度を115200に設定する
-
-    put32(AUX_MU_CNTL_REG,3);               // 最後に、送受信機を有効にする
-```
-
-コード片を一行ずつ見ていきましょう。
+Now our Mini UART is connected to the GPIO pins, and the pins are configured. The rest of the `uart_init` function is dedicated to Mini UART initialization. 
 
 ```
-    put32(AUX_ENABLES,1);                   // mini uartを有効にする（これはそのレジスタへのアクセスも有効にする）
-```
+    put32(AUX_ENABLES,1);                   //Enable mini uart (this also enables access to its registers)
+    put32(AUX_MU_CNTL_REG,0);               //Disable auto flow control and disable receiver and transmitter (for now)
+    put32(AUX_MU_IER_REG,0);                //Disable receive and transmit interrupts
+    put32(AUX_MU_LCR_REG,3);                //Enable 8 bit mode
+    put32(AUX_MU_MCR_REG,0);                //Set RTS line to be always high
+    put32(AUX_MU_BAUD_REG,270);             //Set baud rate to 115200
 
-この行は、Mini UARTを有効にします。これは最初に行う必要があります。これは他のすべての
-Mini UARTレジスタへのアクセスも有効にするからです。
-
+    put32(AUX_MU_CNTL_REG,3);               //Finally, enable transmitter and receiver
 ```
-    put32(AUX_MU_CNTL_REG,0);               // 自動フロー制御、送受信を無効にする（一時的に）
-```
-
-ここでは構成を完了するまで送受信機を無効にしています。また、自動フロー制御を永久に
-無効にしています。この制御にはさらに別のGPIOピンを使用する必要があり、また、TTL-シリアル
-ケーブルはそれをサポートしていないからです。自動フロー制御の詳細については、
-[この記事](http://www.deater.net/weave/vmwprod/hardware/pi-rts/)を参照してください。
+Let's examine this code snippet line by line. 
 
 ```
-    put32(AUX_MU_IER_REG,0);                // 送受信割り込みを無効にする
+    put32(AUX_ENABLES,1);                   //Enable mini uart (this also enables access to its registers)
 ```
-
-新しいデータが利用可能になるたびにプロセッサに割り込みを生成するようにMini UARTを
-設定することができます。割り込みについてはレッスン3で扱う予定なので、現時点では、
-この機能を無効にしておきます。
+This line enables the Mini UART. We must do this in the beginning, because this also enables access to all the other Mini UART registers.
 
 ```
-    put32(AUX_MU_LCR_REG,3);                // 8ビットモードに設定する
+    put32(AUX_MU_CNTL_REG,0);               //Disable auto flow control and disable receiver and transmitter (for now)
 ```
-
-Mini UARTは7ビット操作と8ビット操作をサポートしています。これは、ASCII文字が
-標準セットでは7ビット、拡張セットでは8ビットであるためです。ここでは8ビット
-モードを使用します。
+Here we disable the receiver and transmitter before the configuration is finished. We also permanently disable auto-flow control because it requires us to use additional GPIO pins, and the TTL-to-serial cable doesn't support it. For more information about auto-flow control, you can refer to [this](http://www.deater.net/weave/vmwprod/hardware/pi-rts/) article.
 
 ```
-    put32(AUX_MU_MCR_REG,0);                // RTSラインを常にHighに設定する
+    put32(AUX_MU_IER_REG,0);                //Disable receive and transmit interrupts
 ```
-
-RTSラインはフロー制御で使用されるものなので必要ありません。常にHighになるように
-設定します。
+It is possible to configure the Mini UART to generate a processor interrupt each time new data is available. We are going to start working with interrupts in lesson 3, so for now, we will just disable this feature.
 
 ```
-    put32(AUX_MU_BAUD_REG,270);             // 通信速度を115200に設定する
+    put32(AUX_MU_LCR_REG,3);                //Enable 8 bit mode
 ```
-
-ボーレートとは、通信チャネルで情報を転送する速度のことです。"115200ボー"は
-シリアルポートが最大1秒間に115200ビットの転送ができることを意味します。
-Raspberry Pi mini UARTデバイスのボーレートは、ターミナルエミュレータのボー
-レートと同じである必要があります。Mini UARTは次の式に従ってボーレートを計算します。
+Mini UART can support either 7- or 8-bit operations. This is because an ASCII character is 7 bits for the standard set and 8 bits for the extended. We are going to use 8-bit mode. 
 
 ```
-baudrate = system_clock_freq / (8 * ( baudrate_reg + 1 ))
+    put32(AUX_MU_MCR_REG,0);                //Set RTS line to be always high
 ```
-
-`system_clock_freq`は250MHzなので`baudrate_reg`の値は270と簡単に計算できます。
-
+The RTS line is used in the flow control and we don't need it. Set it to be high all the time.
 ```
-    put32(AUX_MU_CNTL_REG,3);               // 最後に、送受信機を有効にする
+    put32(AUX_MU_BAUD_REG,270);             //Set baud rate to 115200
 ```
+The baud rate is the rate at which information is transferred in a communication channel. “115200 baud” means that the serial port is capable of transferring a maximum of 115200 bits per second. The baud rate of your Raspberry Pi mini UART device should be the same as the baud rate in your terminal emulator. 
+The Mini UART calculates baud rate according to the following equation:
+```
+baudrate = system_clock_freq / (8 * ( baudrate_reg + 1 )) 
+```
+The `system_clock_freq` is 250 MHz, so we can easily calculate the value of `baudrate_reg` as 270.
 
-この行が実行されると、Mini UARTは動作可能な状態になります。
+``` 
+    put32(AUX_MU_CNTL_REG,3);               //Finally, enable transmitter and receiver
+```
+After this line is executed, the Mini UART is ready for work!
 
-### Mini UARTを使ったデータの送信
+### Sending data using the Mini UART
 
-Mini UARTの準備ができたので実際にデータの送受信を行ってみましょう。これを行うには
-次の2つの関数を使用します。
+After the Mini UART is ready, we can try to use it to send and receive some data. To do this, we can use the following two functions:
 
 ```
 void uart_send ( char c )
 {
     while(1) {
-        if(get32(AUX_MU_LSR_REG)&0x20)
+        if(get32(AUX_MU_LSR_REG)&0x20) 
             break;
     }
     put32(AUX_MU_IO_REG,c);
@@ -614,22 +428,17 @@ void uart_send ( char c )
 char uart_recv ( void )
 {
     while(1) {
-        if(get32(AUX_MU_LSR_REG)&0x01)
+        if(get32(AUX_MU_LSR_REG)&0x01) 
             break;
     }
     return(get32(AUX_MU_IO_REG)&0xFF);
 }
 ```
 
-どちらの関数も無限ループから始まりますが、その目的はデバイスがデータを送信または
-受信する準備ができているか否かを確認することです。この確認には`AUX_MU_LSR_REG`
-レジスタを使用します。第0ビットが1に設定されている場合は、データの準備ができている
-ことを示し、UARTから読み取ることができることを意味します。第5ビットが1に設定されて
-いる場合は、送信機が空であることを示し、UARTへの書き込みができることを意味します。
-次に、`AUX_MU_IO_REG`を使用して、送信する文字の値を格納したり、受信した文字の値を
-読み取ったりします。
+Both of the functions start with an infinite loop, the purpose of which is to verify whether the device is ready to transmit or receive data. We are using  the `AUX_MU_LSR_REG` register to do this. Bit zero, if set to 1, indicates that the data is ready; this means that we can read from the UART. Bit five, if set to 1, tells us that the transmitter is empty, meaning that we can write to the UART.
+Next, we use `AUX_MU_IO_REG` to either store the value of the transmitted character or read the value of the received character.
 
-また、文字ではなく文字列を送信することができる非常に簡単な関数も用意しています。
+We also have a very simple function that is capable of sending strings instead of characters:
 
 ```
 void uart_send_string(char* str)
@@ -639,76 +448,57 @@ void uart_send_string(char* str)
     }
 }
 ```
+This function just iterates over all characters in a string and sends them one by one. 
 
-この関数は文字列のすべての文字を一文字ずつ取り出して送信しているだけです。
+### Raspberry Pi config
 
-### Raspberry Piの設定
+The Raspberry Pi startup sequence is the following (simplified):
 
-Raspberry Piの起動シーケンスは以下の通りです（簡略化しています）。
+1. The device is powered on.
+1. The GPU starts up and reads the `config.txt` file from the boot partition. This file contains some configuration parameters that the GPU uses to further adjust the startup sequence.
+1. `kernel8.img` is loaded into memory and executed.
 
-1. デバイスの電源が入る。
-2. GPUが起動し、ブートパーティションから`config.txt`ファイルを読み込みます。
-   このファイルにはGPUが起動シーケンスを微調整するために使用する設定パラメータが
-   含まれています。
-3. `kernel8.img`がメモリにロードされ、実行されます。
-
-私たちのシンプルなOSを実行するために`config.txt`ファイルを以下のようにします。
+To be able to run our simple OS, the `config.txt` file should be the following:
 
 ```
 kernel_old=1
 disable_commandline_tags=1
 ```
+* `kernel_old=1` specifies that the kernel image should be loaded at address 0.
+* `disable_commandline_tags` instructs the GPU to not pass any command line arguments to the booted image.
 
-* `kernel_old=1`はカーネルイメージをアドレス0にロードするよう指定します。
-* `disable_commandline_tags=1`は、ブートイメージにコマンドライン引数も渡さない
-  ようにGPUに指示します。
 
-### カーネルのテスト
+### Testing the kernel
 
-さて、ソースコードを一通り読んだのでいよいよ動作を確認してみましょう。カーネルを
-ビルドしてテストするには、次のようにする必要があります。
+Now that we have gone through all of the source code, it is time to see it work. To build and test the kernel you need to  do the following:
 
-1. [src/lesson01](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src/lesson01)で
-   `./build.sh`または`./build.bat`を実行してカーネルをビルドします。
-2. 生成された`kernel8.img`ファイルをRaspberry Piフラッシュカードの`boot`パーティションに
-   コピーし、`kernel7.img`とSDカードに存在する可能性のある他の`kernel*.img`ファイルを
-   削除します。ブートパーティションにあるその他のファイルはすべてそのままにしておいて
-   ください（詳細はissueの[43](https://github.com/s-matyukevich/raspberry-pi-os/issues/43) と
-   [158](https://github.com/s-matyukevich/raspberry-pi-os/issues/158)を参照）。
-3. 前節で説明したように`config.txt`ファイルを修正します。
-4. [前提条件](../Prerequisites.md)で説明したようにUSB-TTLシリアルケーブルを接続します。
-5. Raspberry Piの電源を入れます。
-6. ターミナルエミュレータを開きます。そこには"Hello, world!"のメッセージが表示されるはずです。
+1. Execute `./build.sh` or `./build.bat` from [src/lesson01](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src/lesson01) in order to build the kernel. 
+1. Copy the generated `kernel8.img` file to the `boot` partition of your Raspberry Pi flash card and delete `kernel7.img` as well as any other `kernel*.img` files that may be present on your SD card. Make sure you left all other files in the boot partition untouched (see [43](https://github.com/s-matyukevich/raspberry-pi-os/issues/43) and [158](https://github.com/s-matyukevich/raspberry-pi-os/issues/158) issues for details)
+1. Modify the `config.txt` file as described in the previous section.
+1. Connect the USB-to-TTL serial cable as described in the [Prerequisites](../Prerequisites.md).
+1. Power on your Raspberry Pi.
+1. Open your terminal emulator. You should be able to see the `Hello, world!` message there.
 
-この手順は、SDカードにRaspbianがインストールされていることを前提としています。
-空のSDカードを使ってRPi OSを起動することも可能です。
+Note that the sequence of steps described above asumes that you have Raspbian installed on your SD card. It is also posible to run the RPi OS using an empty SD card.
 
-1. SDカードを準備します。
-    * MBRパーティションテーブルを使用します。
-    * ブートパーティションをFAT32でフォーマットします。
-    > カードはRaspbianのインストールに必要な方法でフォーマットする必要があります。詳細は
-    [公式ドキュメント](https://www.raspberrypi.org/documentation/installation/noobs.md) の
-    「SDカードをFATでフォーマットする方法」のセクションをご覧ください。
-2. 以下のファイルをカードにコピーします。
-    * [bootcode.bin](https://github.com/raspberrypi/firmware/blob/master/boot/bootcode.bin)
-    これはGPUブートローダです。GPUを起動してGPUファームウェアをロードするためのGPUコードが
-    含まれています。
-    * [start.elf](https://github.com/raspberrypi/firmware/blob/master/boot/start.elf)
-    これはGPUファームウェアです。`config.txt`を読み込んで、GPUが`kernel8.img`からARM固有の
-    ユーザーコードをロードして実行できるようにします。
-3. `kernel8.img`と`config.txt`をコピーします。
-4. USB-TTLシリアルケーブルを接続します。
-5. Raspberry Piの電源を入れます。
-6. ターミナルエミュレータを使って、RPi OSに接続します。
+1. Prepare your SD card:
+    * Use an MBR partition table
+    * Format the boot partition as FAT32
+    > The card should be formatted exactly in the same way as it is required to install Raspbian. Check `HOW TO FORMAT AN SD CARD AS FAT` section in the [official documentation](https://www.raspberrypi.org/documentation/installation/noobs.md) for more information.
+1. Copy the following files to the card:
+    * [bootcode.bin](https://github.com/raspberrypi/firmware/blob/master/boot/bootcode.bin) This is the GPU bootloader, it contains the GPU code to start the GPU and load the GPU firmware. 
+    * [start.elf](https://github.com/raspberrypi/firmware/blob/master/boot/start.elf) This is the GPU firmware. It reads `config.txt` and enables the GPU to load and run ARM specific user code from `kernel8.img`
+1. Copy `kernel8.img` and `config.txt` files. 
+1. Connect the USB-to-TTL serial cable.
+1. Power on your Raspberry Pi.
+1. Use your terminal emulator to connect to the RPi OS. 
 
-残念ながら、Raspberry Piのファームウェアファイルはすべてクローズドソースで文書化
-されていません。Raspberry Piの起動手順については[このStackExchangeでの質問](https://raspberrypi.stackexchange.com/questions/10442/what-is-the-boot-sequence)や
-[このGithubリポジトリ](https://github.com/DieterReuter/workshop-raspberrypi-64bit-os/blob/master/part1-bootloader.md)などの非公式なソースを参考にすることができます。
+Unfortunately, all Raspberry Pi firmware files are closed-sourced and undocumented. For more information about the Raspberry Pi startup sequence, you can refer to some unofficial sources, like [this](https://raspberrypi.stackexchange.com/questions/10442/what-is-the-boot-sequence) StackExchange question or [this](https://github.com/DieterReuter/workshop-raspberrypi-64bit-os/blob/master/part1-bootloader.md) Github repository.
 
-##### 前ページ
+##### Previous Page
 
-[前提条件](../../docs/Prerequisites.md)
+[Prerequisites](../../docs/Prerequisites.md)
 
-##### 次ページ
+##### Next Page
 
-1.2 [カーネルの初期化: Linuxプロジェクトの構成](../../docs/lesson01/linux/project-structure.md)
+1.2 [Kernel Initialization: Linux project structure](../../docs/lesson01/linux/project-structure.md)

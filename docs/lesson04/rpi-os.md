@@ -1,20 +1,10 @@
-## 4.1: スケジューラ
+## 4.1: Scheduler
 
-RPi OSはもうすでにかなり複雑なベアメタルプログラムになっていますが、正直なところ、
-まだOSとは呼べません。なぜなら、OSが行うべきコアタスクが何もできないからです。
-そのようなコアタスクの一つにプロセススケジューリングというものがあります。
-スケジューリングとは、OSがCPU時間を複数のプロセス間で共有できるようにすることです。
-難しいのはプロセスにはスケジューリングが行われていることを意識させてはならない
-ことです。プロセスには自分だけがCPUを独占しているように思わせる必要があります。
-このレッスンでは、この機能をRPi OSに追加しましょう。
+By now, the PRi OS is already a fairly complicated bare metal program, but to be honest, we still can't call it an operating system. The reason is that it can't do any of the core tasks that any OS should do. One of such core tasks is called process scheduling. By scheduling I mean that an operating system should be able to share CPU time between different processes. The hard part of it is that a process should be unaware of the scheduling happening: it should view itself as the only one occupying the CPU. In this lesson, we are going to add this functionality to the RPi OS.
 
 ### task_struct
 
-プロセスを管理するためには、まず、プロセスを記述する構造体を作る必要があります。
-Linuxにはそのような構造体があり、`task_struct`と呼ばれています（Linuxでは
-スレッドとプロセスはタイプが異なるタスクにすぎません）。ここでは、ほとんど
-Linuxの実装を真似ているので、同じようにします。RPi OSの[task_struct](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/sched.h#L36)は
-次のようになっています。
+If we want to manage processes, the first thing we should do is to create a struct that describes a process. Linux has such a struct and it is called `task_struct`  (in Linux both thread and processes are just different types of tasks). As we are mostly mimicking Linux implementation, we are going to do the same. RPi OS [task_struct](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/sched.h#L36) looks like the following.
 
 ```
 struct cpu_context {
@@ -42,63 +32,25 @@ struct task_struct {
 };
 ```
 
-この構造体には次のメンバーがあります。
+This struct has the following members:
 
-* `cpu_context` これは、切り替えられるタスク間で異なる可能性のあるすべての
-レジスタの値を含む埋め込みの構造体です。なぜすべてのレジスタではなく，レジスタ
-`x19 - x30`と`sp`だけ（`fp`は`x29`、`pc`は`x30`なので）を保存するのかという
-疑問は当然です。その答えは，実際のコンテキストスイッチはタスクが[cpu_switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.S#L4)
-関数を呼び出したときに初めて行われるからです。つまり、切り替えられるタスクの観点
-から言えば、`cpu_switch_to`関数を呼び出して、ある程度の（長い場合もありますが）
-時間が経ってから復帰するだけです。この間に別のタスクが実行されたことをタスクは
-知りません。ARMの呼び出し規約では、レジスタ`x0 - x18`は呼び出された関数によって
-上書きされる可能性があるため、呼び出し側はこれらのレジスタの値が関数呼び出し後に
-保存されていると仮定してはいけません。これがレジスタ`x0 - x18`の保存が意味のない
-理由です。
-* `state` これは現在実行中のタスクの状態です。たった今CPU上で何らかの作業をしている
-タスクの状態は常に[TASK_RUNNING](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/sched.h#L15)です。実は、今のところRPi OSがサポートして
-いる状態はこの状態だけです。しかし、後でいくつかの状態を追加しなければならなくなり
-ます。たとえば、割り込みを待っているタスクは別の状態に移さなければなりません。
-必要な割り込みがまだ起こっていないのにタスクを目覚めさせるのは意味がないからです。
-* `counter` このフィールドは、現在のタスクがどれだけの間、実行されてきたかを決定する
-ために使用されます。`counter`はタイマの1ティックごとに1ずつ減少し、0になると別の
-タスクがスケジュールされます。
-* `priority`  新しいタスクがスケジュールされると、その`priority`が`counter`に
-コピーされます。タスクの優先度を設定することにより、他のタスクと比較してタスクが
-取得するプロセッサ時間を調整することができます。
-* `preempt_count` このフィールドがゼロ以外の値を持つ場合、現在のタスクが割り込みを
-受けてはならないクリティカルな機能を実行していることを示します (たとえば、
-スケジューリング機能を実行している場合)。そのような時にタイマティックが発生しても、
-それは無視され、再スケジューリングはトリガされません。
+* `cpu_context` This is an embedded structure that contains values of all registers that might be different between the tasks, that are being switched. A reasonable question to ask is why do we save not all registers, but only registers `x19 - x30` and `sp`? (`fp` is `x29` and `pc` is `x30`) The answer is that actual context switch happens only when a task calls [cpu_switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.S#L4) function. So, from the point of view of the task that is being switched, it just calls `cpu_switch_to` function and it returns after some (potentially long) time. The task doesn't notice that another task happens to runs during this period.  Accordingly to ARM calling conventions registers `x0 - x18` can be overwritten by the called function, so the caller must not assume that the values of those registers will survive after a function call. That's why it doesn't make sense to save `x0 - x18` registers.
+* `state` This is the state of the currently running task. For tasks that are just doing some work on the CPU the state will always be [TASK_RUNNING](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/sched.h#L15). Actually, this is the only state that the RPi OS is going to support for now. However, later we will have to add a few additional states. For example, a task that is waiting for an interrupt should be moved to a different state, because it doesn't make sense to awake the task while the required interrupt hasn't yet happened.
+* `counter` This field is used to determine how long the current task has been running. `counter` decreases by 1 each timer tick and when it reaches 0 another task is scheduled.
+* `priority`  When a new task is scheduled its `priority` is copied to `counter`. By setting tasks priority, we can regulate the amount of processor time that the task gets relative to other tasks.
+* `preempt_count` If this field has a non-zero value it is an indicator that right now the current task is executing some critical function that must not be interrupted (for example, it runs the scheduling function.). If timer tick occurs at such time it is ignored and rescheduling is not triggered.
 
-カーネルの起動後は1つのタスクだけが実行されています。これは[kernel_main](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L19)
-関数を実行するタスクです。これは「initタスク」と呼ばれます。スケジューラ機能を有効に
-する前に、initタスクに対応する`task_struct`を埋める必要があります。これは
- [sched.h#L53](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/sched.h#L53)で
- 行っています。
+After the kernel startup, there is only one task running: the one that runs [kernel_main](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L19) function. It is called "init task". Before the scheduler functionality is enabled, we must fill `task_struct` corresponding to the init task. This is done [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/sched.h#L53).
 
-すべてのタスクは[task](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L7)
-配列に格納されます。この配列には64のスロットしかありません。これが、RPi OSで同時に
-実行できるタスクの最大数です。もちろんこれは製品レベルのOSとしてはベストな
-ソリューションではありませんが、私たちの目的には問題ありません。
+All tasks are stored in [task](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L7) array. This array has only 64 slots - that is the maximum number of simultaneous tasks that we can have in the RPi OS. It is definitely not the best solution for the production-ready OS, but it is ok for our goals.
 
-また、常に現在実行中のタスクを指している[current](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L6)と
-いう非常に重要な変数もあります。`current`も`task`配列も初期状態ではinitタスクへの
-ポインタが設定されています。また、システムで現在実行中のタスクの数を保持する
-[nr_tasks](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L8)と
-いうグローバル変数もあります。
+There is also a very important variable called [current](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L6) that always points to the currently executing task. Both `current` and `task` array are initially set to hold a pointer to the init task. There is also a global variable called [nr_tasks](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L8) - it contains the number of currently running tasks in the system.
 
-以上がスケジューラ機能を実装するために使用するすべての構造体とグローバル変数です。
-スケジューリングの仕組みについてはすでに`task_struct`の説明の中で簡単に触れましたが、
-それは、特定の`task_struct`フィールドの意味を理解するにはそのフィールドがどのように
-使われているかを理解することが不可欠だからです。今からはスケジューリングアルゴリズムの
-詳細を見ていきますが、まずは`kernel_main`関数から始めましょう。
+Those are all structures and global variables that we are going to use to implement the scheduler functionality. In the description of the `task_struct` I already briefly mentioned some aspects of how scheduling works, because it is impossible to understand the meaning of a particular `task_struct` field without understanding how this field is used. Now we are going to examine the scheduling algorithm in much more details and we will start with the `kernel_main` function.
 
-### `kernel_main`関数
+### `kernel_main` function
 
-スケジューラの実装を掘り下げる前に、スケジューラが実際に動作することを証明する方法を
-簡単に紹介したいと思います。これを理解するには、[kernel.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c)
-ファイルを見てみる必要があります。関連する内容をここにコピーしました。
+Before we dig into the scheduler implementation, I want to quickly show you how we are going to prove that the scheduler actually works. To understand it, you need to take a look at the [kernel.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c) file. Let me copy the relevant content here.
 
 ```
 void kernel_main(void)
@@ -127,20 +79,12 @@ void kernel_main(void)
 }
 ```
 
-このコードにはいくつかの重要な点があります。
+There are a few important things about this code.
 
-1. 新しい関数[copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5)が
-導入されています。`copy_process`は2つの引数を取ります。新しいスレッドで実行する
-関数と、この関数に渡す引数です。`copy_process`は新しく`task_struct`を割り当て、
-スケジューラが利用可能にします。
-1. もうひとつの新しい関数は[schedule](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L21)です。
-これはスケジューラの中核的な関数です。この関数は、現在のタスクをプリエンプト
-する必要のある新しいタスクがないかチェックします。タスクはその時点で行うべき
-ことがない場合、自発的に`schedule`を呼び出すことができます。 `schedule`は
-タイマ割り込みハンドラからも呼び出されます。
+1. New function [copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5) is introduced. `copy_process` takes 2 arguments: a function to execute in a new thread and an argument that need to be passed to this function. `copy_process` allocates a new `task_struct`  and makes it available for the scheduler.
+1. Another new function for us is called [schedule](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L21). This is the core scheduler function: it checks whether there is a new task that needs to preempt the current one. A task can voluntarily call `schedule` if it doesn't have any work to do at the moment. `schedule` is also called from the timer interrupt handler.
 
-ここでは`copy_process`を2回呼び出していますが、毎回第一引数に[process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L9)
-関数へのポインタを渡しています。`process`関数は非常にシンプルです。
+We are calling `copy_process` 2 times, each time passing a pointer to the [process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L9) function as the first argument. `process` function is very simple.
 
 ```
 void process(char *array)
@@ -154,15 +98,11 @@ void process(char *array)
 }
 ```
 
-引数として渡された配列の文字を画面に表示し続けるだけです。最初に呼び出された時の
-引数は"12345"で、2回目の引数は"abcde"です。スケジューラの実装が正しければ、両
-スレッドからの出力が混在して画面に表示されるはずです。
+It just keeps printing on the screen characters from the array, that is passed as an argument The first time it is called with the argument "12345" and second time the argument is "abcde". If our scheduler implementation is correct, we should see on the screen mixed output from both threads.
 
-### メモリ割り当て
+### Memory allocation
 
-システム内の各タスクは専用のスタックを持つ必要があります。そのため、新しいタスクを
-作成する際にはメモリを割り当てる方法が必要です。今のところ、私たちのメモリアロケータは
-極めて原始的なものです(実装は[mm.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/mm.c)ファイルにあります)。
+Each task in the system should have its dedicated stack. That's why when creating a new task we must have a way to allocate memory. For now, our memory allocator is extremely primitive. (The implementation can be found in [mm.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/mm.c) file)
 
 ```
 static unsigned short mem_map [ PAGING_PAGES ] = {0,};
@@ -182,24 +122,14 @@ void free_page(unsigned long p){
     mem_map[(p - LOW_MEMORY) / PAGE_SIZE] = 0;
 }
 ```
+The allocator can work only with memory pages (each page is 4 KB in size). There is an array called `mem_map` that for each page in the system holds its status: whether it is allocated or free. Whenever we need to allocate a new page, we just loop through this array and return the first free page. This implementation is based on 2 assumptions:
 
-このアロケータはメモリページ単位（1ページのサイズは4KB）でのみ動作します。システム
-内の各ページの状態を保持する`mem_map`と呼ばれる配列があり、ページが割り当て
-済みか、未使用かを示しています。そして、新しいページを割り当てる必要がある度に、
-この配列をループして、最初の空きページを返すだけです。この実装は2つの仮定に
-基づいています。
+1. We know the total amount of memory in the system. It is `1 GB - 1 MB` (the last megabyte of memory is reserved for device registers.). This value is stored in the [HIGH_MEMORY](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/mm.h#L14) constant.
+1. First 4 MB of memory are reserved for the kernel image and init task stack. This value is stored in [LOW_MEMORY](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/mm.h#L13) constant. All memory allocations start right after this point.
 
-1. システムに搭載されているメモリの総量を知っている。それは`1GB - 1MB`です（最後の
-1メガバイトはデバイスレジスタ用に予約されています）。この値は、[HIGH_MEMORY](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/mm.h#L14)
-定数に格納されています。
-2. メモリの最初の4MBは、カーネルイメージとinitタスクスタック用に予約されている。
-この値は、[LOW_MEMORY](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/mm.h#L13)
-定数に格納されています。すべてのメモリの割り当てはこのアドレスの直後から始まります。
+### Creating a new task
 
-### 新しいタスクを作成する
-
-新しいタスクの割当は[copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5)
-関数で実装されています。
+New task allocation is implemented in [copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5) function.
 
 ```
 int copy_process(unsigned long fn, unsigned long arg)
@@ -226,16 +156,14 @@ int copy_process(unsigned long fn, unsigned long arg)
 }
 ```
 
-では、これを詳しく見ていきましょう。
+Now, we are going to examine it in details.
 
 ```
     preempt_disable();
     struct task_struct *p;
 ```
 
-この関数はプリエンプションを無効にし、新しいタスクのためのポインタを割り当てる
-ことから始まります。プリエンプションを無効にするのは`copy_process`関数の途中で
-別のタスクにリスケジュールされたくないからです。
+The function starts with disabling preemption and allocating a pointer for the new task. Preemption is disabled because we don't want to be rescheduled to a different task in the middle of the `copy_process` function.
 
 ```
     p = (struct task_struct *) get_free_page();
@@ -243,9 +171,7 @@ int copy_process(unsigned long fn, unsigned long arg)
         return 1;
 ```
 
-次に、新しいページを割り当てます。このページの最下位アドレスから新しく
-作成したタスクの`task_struct`を配置します。このページの残りの部分は
-タスクスタックとして使用されます。
+Next, a new page is allocated. At the bottom of this page, we are putting the `task_struct` for the newly created task. The rest of this page will be used as the task stack.
 
 ```
     p->priority = current->priority;
@@ -254,11 +180,7 @@ int copy_process(unsigned long fn, unsigned long arg)
     p->preempt_count = 1; //disable preemtion until schedule_tail
 ```
 
-`task_struct`を割り当てたら、そのプロパティを初期化します。優先度と初期カウンタは
-カレントタスクの優先度に基づいて設定します。状態には`TASK_RUNNING`を設定し、
-新しいタスクは開始する準備ができていることを示します。`preempt_count`には1を設定
-します。これは、タスクの実行後、何らかの初期化作業を完了するまではリスケジューリング
-してはいけないことを意味します。
+After the `task_struct` is allocated, we can initialize its properties.  Priority and initial counters are set based on the current task priority. The state is set to `TASK_RUNNING`, indicating that the new task is ready to be started. `preempt_count` is set to 1, meaning that after the task is executed it should not be rescheduled until it completes some initialization work.
 
 ```
     p->cpu_context.x19 = fn;
@@ -267,9 +189,7 @@ int copy_process(unsigned long fn, unsigned long arg)
     p->cpu_context.sp = (unsigned long)p + THREAD_SIZE;
 ```
 
-これはこの関数の最も重要な部分です。ここで`cpu_context`を初期化します。スタック
-ポインタには新しく割り当てられたメモリページの最上位アドレスを設定します。`pc`には [ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L146)関数を設定します。`cpu_context`レジスタの残りの部分を
-なぜこのように初期化するかを理解するためにはこの関数を見てみる必要があります。
+This is the most important part of the function. Here `cpu_context` is initialized. The stack pointer is set to the top of the newly allocated memory page. `pc`  is set to the [ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L146) function, and we need to look at this function now in order to understand why the rest of the `cpu_context` registers are initialized in the way they are.
 
 ```
 .globl ret_from_fork
@@ -279,12 +199,9 @@ ret_from_fork:
     blr    x19         //should never return
 ```
 
-`ret_from_fork`は、まず[schedule_tail](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L65)を呼び出してプリエンプションを有効にし、
-次に、`x19`レジスタに格納されている関数を`x20`に格納されている引数で呼び出している
-のがわかります。`x19`と`x20`は`ret_from_fork`関数が呼び出される直前に`cpu_context`
-から復元されます。
+As you can see `ret_from_fork` first call [schedule_tail](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L65), which just enabled preemption, and then it calls the function stored in `x19` register with the argument stored in `x20`. `x19` and `x20` are restored from the `cpu_context` just before `ret_from_fork` function is called. 
 
-では、`copy_process`に戻りましょう。
+Now, let's go back to `copy_process`.
 
 ```
     int pid = nr_tasks++;
@@ -293,24 +210,18 @@ ret_from_fork:
     return 0;
 ```
 
-最後に、`copy_process`は新しく作成したタスクを`task`配列に追加し、カレントタスクの
-プリエンプションを有効にします。
+Finally, `copy_process` adds the newly created task to the `task` array and enables preemption for the current task.
 
-`copy_process`関数について理解すべき重要な点は、この関数の実行終了後にコンテキスト
-スイッチは起きないことです。この関数は新しい`task_struct`を用意して`task`配列に
-追加するだけです。このタスクが実行されるのは`schedule`関数が呼び出された後です。
+An important thing to understand about the `copy_process` function is that after it finishes execution, no context switch happens. The function only prepares new `task_struct` and adds it to the `task` array — this task will be executed only after `schedule` function is called.
 
-### 誰が`schedule`を呼び出すのか？
+### Who calls `schedule`?
 
-`schedule`関数の詳細を説明する前に、まず、`schedule`がどのように呼び出されるかを
-把握しましょう。2つのシナリオがあります。
+Before we get into the details of the `schedule` function, lets first figure out how `schedule` is called. There are 2 scenarios.
 
-1. あるタスクが今はやることがないが終了させることはできない場合、自発的に
-`schedule`を呼び出すことができます。これは`kernel_main`関数が行っているものです。
-2. `schedule`は[タイマ割り込みハンドラ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/timer.c#L21)ハンドラからも定期的に
-呼び出されます。
+1. When one task doesn't have anything to do right now, but it nevertheless can't be terminated, it can call `schedule` voluntarily. That is something `kernel_main` function does.
+1. `schedule` is also called on a regular basis from the [timer interrupt handler](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/timer.c#L21).
 
-では、タイマ割り込みから呼び出される[timer_tick](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L70)関数を見てみましょう。
+Now let's take a look at [timer_tick](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L70) function, which is called from the timer interrupt.
 
 ```
 void timer_tick()
@@ -325,17 +236,11 @@ void timer_tick()
     disable_irq();
 ```
 
-まず最初に、カレントタスクのカウンタを減少させます。カウンタが0より大きい場合、
-または現在プリエンプションが禁止されている場合、関数は復帰します。そうでない場合、
-割り込みを有効にして`schedule`が呼び出されます（これは割り込みハンドラの中であり、
-割り込みはデフォルトで無効になっています）。スケジューラの実行時に割り込みを
-有効にしなければならない理由は次のセクションで説明します。
+First of all, it decreases current task's counter. If the counter is greater then 0 or preemption is currently disabled the function returns, but otherwise`schedule` is called with interrupts enabled. (We are inside an interrupt handler, and interrupts are disabled by default) We will see why interrupts must be enabled during scheduler execution in the next section.
 
-### スケジューリングアルゴリズム
+### Scheduling algorithm
 
-ようやくスケジューラのアルゴリズムを見る準備ができました。このアルゴリズムは
-Linuxカーネルの最初のリリースからほぼ正確にコピーしました。オリジナルのバージョンは
-[ここ](https://github.com/zavg/linux-0.01/blob/master/kernel/sched.c#L68)にあります。
+Finally, we are ready to look at the scheduler algorithm. I almost precisely copied this algorithm from the first release of the Linux kernel. You can find the original version [here](https://github.com/zavg/linux-0.01/blob/master/kernel/sched.c#L68).
 
 ```
 void _schedule(void)
@@ -368,43 +273,20 @@ void _schedule(void)
 }
 ```
 
-アルゴリズムは以下のようになっています。
+The algorithm works like the following:
 
-* 内側の最初の`for`ループは、すべてのタスクをイテレートし、状態が`TASK_RUNNING`で
-最大のカウンタを持つタスクを探します。そのようなタスクが見つかり、そのカウンタが
-0より大きい場合、すぐに外側の`while`ループを抜けてそのタスクに切り替えます。
-そのようなタスクが見つからない場合は、現在、`TASK_RUNNING`状態のタスクが存在
-しないか、`TASK_RUNNING`状態のタスクのカウンタがすべて0であることを意味します。
-実際のOSでは前者のケースは起きる可能性があります。たとえば、すべてのタスクが
-割り込みを待っている場合です。この場合、2つ目の`for`ループが実行されます。
-このループは（その状態にかかわらず）すべてのタスクのカウンタを増加させます。
-このカウンタの増加は非常にスマートな方法で行われます。
+ * The first inner `for` loop iterates over all tasks and tries to find a task in `TASK_RUNNING` state with the maximum counter. If such task is found and its counter is greater then 0, we immediately break from the outer `while` loop and switch to this task. If no such task is found this means that no tasks in `TASK_RUNNING`  state currently exist or all such tasks have 0 counters. In a real OS, the first case might happen, for example, when all tasks are waiting for an interrupt. In this case, the second nested `for` loop is executed. For each task (no matter what state it is in) this loop increases its counter. The counter increase is done in a very smart way:
 
-    1. タスクが2回目の`for`ループを通過すればするだけ、そのカウンタは増大します。
-    2. タスクのカウンタは絶対に`2 * priority`よりも大きくなりません。
+    1. The more iterations of the second `for` loop a task passes, the more its counter will be increased.
+    2. A task counter can never get larger than `2 * priority`.
 
-* その後、このプロセスが繰り返されます。`TASK_RUNNIG`状態のタスクが1つでもあれば
-外側の`while`ループの2回目の繰り返しが最後になります。なぜなら、1回目の繰り返しで
-すべてのタスクのカウンタはゼロではなくなるからです。しかし、`TASK_RUNNING`状態の
-タスクが1つもなければ、どれかのタスクが`TASK_RUNNING`状態に移行するまで、この
-プロセスが何度も繰り返されます。しかし、シングルCPUで動作している場合、どのような
-場合に、このループの実行中にタスクの状態が変化するのでしょうか。その答えは、ある
-タスクが割り込みを待っている場合です。`schedule`関数の実行中にこの割り込みが発生し、
-割り込みハンドラがタスクの状態を変更することができるからです。これが`schedule`の
-実行中に割り込みを有効にしなければならない理由です。これは割り込みの無効化と
-プリエンプションの無効化の重要な違いも示しています。プリエンプションの無効化により、
-元の関数の実行中に入れ子になった`schedule`が呼び出されることはありません。
-しかし、割り込みは`schedule` 関数の実行中に合法的に発生することができます。
+* Then the process is repeated. If there are at least one task in `TASK_RUNNIG` state, the second iteration of the outer `while` loop will be the last one because after the first iteration all counters are already non-zero. However, if no `TASK_RUNNING` tasks are there, the process is repeated over and over again until some of the tasks will move to `TASK_RUNNING` state. But if we are running on a single CPU, how then a task state can change while this loop is running? The answer is that if some task is waiting for an interrupt, this interrupt can happen while `schedule` function is executed and interrupt handler can change the state of the task. This actually explains why interrupts must be enabled during `schedule` execution. This also demonstrates an important distinction between disabling interrupts and disabling preemption. `schedule` disables preemption for the duration of the whole function. This ensures that nested `schedule` will not be called while we are in the middle of the original function execution. However, interrupts can legally happen during `schedule` function execution.
 
-あるタスクが割り込みを待っているという状況にはかなり注意を払いましたが、
-この機能はRPi OSにはまだ実装されていません。しかし、このケースはスケジューラの
-コアアルゴリズムの一部であり、同様の機能を後に追加する予定ですので理解して
-おく必要があると考えています。
+I paid a lot of attention to the situation where some task is waiting for an interrupt, though this functionality isn't implemented in the RPi OS yet. But I still consider it necessary to understand this case because it is a part of the core scheduler algorithm and similar functionality will be added later. 
 
-### タスクを切り替える
+### Switching tasks
 
-カウンタが0でない`TASK_RUNNING`状態のタスクが見つかると[switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L56)関数が
-呼び出されます。これは次のようなものです。
+After the task in `TASK_RUNNING` state with non-zero counter is found, [switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L56) function is called. It looks like this.
 
 ```
 void switch_to(struct task_struct * next)
@@ -417,9 +299,7 @@ void switch_to(struct task_struct * next)
 }
 ```
 
-ここでは、次のプロセスがカレントプロセスと同じでないかチェックし、同じで
-なければ`current`変数を更新します。実際の作業は[cpu_switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.S)関数に
-リダイレクトされます。
+Here we check that next process is not the same as the current, and if not, `current` variable is updated. The actual work is redirected to [cpu_switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.S) function.
 
 ```
 .globl cpu_switch_to
@@ -446,18 +326,14 @@ cpu_switch_to:
     ret
 ```
 
-ここが本当の意味でのコンテクストスイッチが行われる場所なのです。一行ずつ見て
-いきましょう。
+This is the place where the real context switch happens. Let's examine it line by line.
 
 ```
     mov    x10, #THREAD_CPU_CONTEXT
     add    x8, x0, x10
 ```
 
-`THREAD_CPU_CONTEXT`定数には`task_struct`における`cpu_context`構造体のオフセットが
-格納されています。`x0`にはこの関数の第1引数へのポインタが格納されており、それは
-現在の`task_struct`です（ここで言う現在とは、prevプロセスの`task_struct`を意味します）。
-最初の2行が実行された後、`x8`には現在の`cpu_context`へのポインタが格納されます。
+`THREAD_CPU_CONTEXT` constant contains offset of the `cpu_context` structure in the `task_struct`. `x0` contains a pointer to the first argument, which is the current `task_struct` (by current here I mean the one we are switching from).  After the copied 2 lines are executed, `x8` will contain a pointer to the current `cpu_context`.
 
 ```
     mov    x9, sp
@@ -469,19 +345,13 @@ cpu_switch_to:
     stp    x29, x9, [x8], #16
     str    x30, [x8]
 ```
-
-次に、calleeが保存すべきすべてのレジスタを`cpu_context`構造体で定義された順番で
-保存します。リンクレジスタであり，関数のリターンアドレスを保持している`x30`は
-`pc`として，カレントスタックポインタは`sp`として、`x29`は`fp`（フレームポインタ）と
-して保存します。
+Next all calle-saved registers are stored in the order, in which they are defined in `cpu_context` structure. `x30`, which is the link register and contains function return address, is stored as `pc`, current stack pointer is saved as `sp` and `x29` is saved as `fp` (frame pointer).
 
 ```
     add    x8, x1, x10
 ```
 
-現在`x10`には`task_struct`における`cpu_context`構造体のオフセットが入っており、
-`x1`は次（切り替え先）のプロセスの`task_struct`へのポインタなので、`x8`には次の
-プロセスの`cpu_context`へのポインタが入ることになります。
+Now `x10` contains an offset of the `cpu_context` structure inside `task_struct`, `x1` is a pointer to the next `task_struct`, so `x8` will contain a pointer to the next `cpu_context`.
 
 ```
     ldp    x19, x20, [x8], #16        // restore callee-saved registers
@@ -494,44 +364,23 @@ cpu_switch_to:
     mov    sp, x9
 ```
 
-Calleeが保存したレジスタを次のプロセスの`cpu_context`から復元します。
+Callee saved registers are restored from the next `cpu_context`.
 
 ```
     ret
 ```
 
-関数はリンクレジスタ(`x30`)で指定された場所に復帰します。何らかのタスクに初めて
-切り替わる場合は、それは[ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L148)関数です。
-それ以外の場合は、`cpu_switch_to`関数により`cpu_context`に保存された場所です。
+Function returns to the location pointed to by the link register (`x30`) If we are switching to some task for the first time, this will be [ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L148) function. In all other cases this will be the location, previously saved in the `cpu_context` by the `cpu_switch_to` function.
 
-### 例外の入出力があるスケジューリングはどのように動くのか
+### How scheduling works with exception entry/exit?
 
-前回のレッスンでは、[kernel_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L17)マクロと
-[kernel_exit](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L4)マクロを
-使ってプロセッサの状態の保存と復元をする方法を説明しました。スケジューラを導入する
-と新たな問題が発生します。あるタスクで割込みに入り、別のタスクで割込みから抜ける
-ことができるようになったからです。これが問題となるのは、割り込みから復帰するために
-使用する`eret`命令は、復帰アドレスは`elr_el1`に、プロセッサの状態は`spsr_el1`
-レジスタに格納されている必要があるという事実に依存しているからです。そのため、
-割り込み処理中にタスクを切り替えたい場合は、すべての汎用レジスタと共にこの2つの
-レジスタも保存・復元しなければなりません。これを行うコードは非常に簡単で、保存の
-部分は[`entry.S#L35`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L35)、復元の部分は[`entry.S#L46`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L46)で見ることができます。
+In the previous lesson, we have seen how [kernel_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L17) and [kernel_exit](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L4) macros are used to save and restore the processor state. After the scheduler has been introduced, a new problem arrives: now it becomes fully legal to enter an interrupt as one task and leave it as a different one. This is a problem, because `eret` instruction, which we are using to return from an interrupts, relies on the fact that return address should be stored in `elr_el1` and processor state in `spsr_el1` registers. So, if we want to switch tasks while processing an interrupt, we must save and restore those 2 registers alongside with all other general purpose registers. The code that does this is very straightforward, you can find the save part [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L35) and restore [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L46).
 
-### コンテキストスイッチ中のシステムの状態を追跡する
+### Tracking system state during a context switch
 
-これまでにコンテキストスイッチに関連するすべてのソースコードを調べてきました。
-しかし、このコードには数多くの非同期の動作が関与しており、システム全体の状態が
-時間とともにどのように変化するかを完全に理解することは困難です。この節ではこの
-理解を容易にしたいと思います。ここでは、システムの起動から2回目のコンテキスト
-スイッチが行われるまでの一連のイベントを説明したいと思います。そのようなイベント
-ごとに、イベント発生時のメモリの状態を表す図も掲載します。このような方法により
-スケジューラがどのように動作するのかを深く理解する手助けとなることを期待します。
-では、始めましょう。
+We have already examined all source code related to the context switch. However, that code contains a lot of asynchronous interactions that make it difficult to fully understand how the state of the whole system changes over time. In this section I want to make this task easier for you: I want to describe the sequence of events that happen from system startup to the time of the second context switch. For each such event, I will also include a diagram representing the state of the memory at the time of the event. I hope that such representation will help you to get a deep understanding of how the scheduler works. So, let's start!
 
-1. カーネルが初期化され、[kernel_main](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L19)
-関数が実行されます。初期スタックは、4MBの位置にある[LOW_MEMORY](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/mm.h#L13)から
-始まるように設定されています。
-
+1. The kernel is initialized and [kernel_main](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L19) function is executed. The initial stack is configured to start at [LOW_MEMORY](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/include/mm.h#L13), which is 4 MB.
     ```
              0 +------------------+
                | kernel image     |
@@ -546,10 +395,7 @@ Calleeが保存したレジスタを次のプロセスの`cpu_context`から復�
                | device registers |
     0x40000000 +------------------+
     ```
-2. `kernel_main`が[copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5)を
-初めて呼び出します。新たに4KBのメモリページが割り当てられ、このページの最下位アドレスに
-`task_struct`が配置されます（この時点で作成されたタスクは以後「タスク 1」と呼びます）。
-
+1. `kernel_main` calls [copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/fork.c#L5) for the first time. New 4 KB memory page is allocated, and `task_struct` is placed at the bottom of this page. (Later I will refer to the task created at this point as "task 1")
     ```
              0 +------------------+
                | kernel image     |
@@ -568,9 +414,7 @@ Calleeが保存したレジスタを次のプロセスの`cpu_context`から復�
                | device registers |
     0x40000000 +------------------+
     ```
-3. `kernel_main`が2回目の`copy_process`を呼び出し、同じ処理を繰り返します。タスク 2が
-作成され、タスクリストに追加されます。
-
+1.  `kernel_main` calls `copy_process` for the second time and the same process repeats. Task 2 is created and added to the task list.
     ```
              0 +------------------+
                | kernel image     |
@@ -593,18 +437,11 @@ Calleeが保存したレジスタを次のプロセスの`cpu_context`から復�
                | device registers |
     0x40000000 +------------------+
     ```
-4. `kernel_main`は自発的に[schedule](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L21)
-関数を呼び出し、タスク　1の実行を決定します。
-5. [cpu_switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.S#L4)は
-calee保存レジスタをカーネルイメージ内にあるinitタスクの`cpu_context`に保存します。
-6. `cpu_switch_to`はタスク 1の`cpu_context`からcalee保存レジスタを復元します。この
-段階で、`sp`は`0x00401000`を、リンクレジスタは[ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L146)
-関数を指しており、`x19`は[process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L9)
-関数へのポインタを、`x20`はカーネルイメージ内のどこかにある文字列 "12345" への
-ポインタを保持しています。
-7. `cpu_switch_to`は`ret`命令を呼び出し、`ret_from_fork`関数にジャンプします。
-8. `ret_from_fork`はレジスタ`x19`と`x20`を読み込み、`process`関数を引数 "12345"で
-呼び出します。`process`関数が実行されると、そのスタックが増え始めます。
+1. `kernel_main` voluntarily calls [schedule](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L21) function and it decides to run task 1.
+1. [cpu_switch_to](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.S#L4) saves calee-saved registers in the init task `cpu_context`, which is located inside the kernel image.
+1. `cpu_switch_to` restores calee-saved registers from task 1 `cpu_context`. `sp` now points to `0x00401000`, link register to [ret_from_fork](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L146) function, `x19` contains a pointer to [process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/kernel.c#L9) function and `x20` a pointer to string "12345", which is located somewhere in the kernel image.
+1. `cpu_switch_to` calls `ret` instruction, which jumps to the `ret_from_fork` function.
+1. `ret_from_fork` reads `x19` and `x20` registers and  calls `process` function with the argument "12345". After `process` function starts to execute its stack begins to grow.
     ```
              0 +------------------+
                | kernel image     |
@@ -629,10 +466,7 @@ calee保存レジスタをカーネルイメージ内にあるinitタスクの`c
                | device registers |
     0x40000000 +------------------+
     ```
-9.  タイマ割り込みが発生します。[kernel_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L17)
-マクロはすべての汎用レジスタに加えて`elr_el1`と`spsr_el1`をタスク　1のスタックの
-下位アドレスに保存します。
-
+1. A timer interrupt occured. [kernel_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/entry.S#L17) macro saves all general purpose registers + `elr_el1` and `spsr_el1` to the bottom of task 1 stack.
     ```
              0 +------------------------+
                | kernel image           |
@@ -659,10 +493,7 @@ calee保存レジスタをカーネルイメージ内にあるinitタスクの`c
                | device registers       |
     0x40000000 +------------------------+
     ```
-10. `schedule`が呼び出され、タスク　2の実行を決定します。しかし、タスク　1はまだ実行
-しており、そのスタックはタスク　1のレジスタ保存領域の下に成長中です。以下の図では、
-スタックのこの部分を(int)と表示しており、これは "割り込みスタック "を意味します。
-
+1. `schedule` is called and it decides to run task 2. But we still run task 1 and its stack continues to grow below task 1 saved registers region. On the diagram, this part of the stack is marked as (int), which means "interrupt stack"
     ```
              0 +------------------------+
                | kernel image           |
@@ -691,12 +522,7 @@ calee保存レジスタをカーネルイメージ内にあるinitタスクの`c
                | device registers       |
     0x40000000 +------------------------+
     ```
-11. `cpu_switch_to`はタスク 2を実行します。これを行うためにタスク 1とまったく同じ
-手順を実行します。タスク 2の実行が開始され、スタックが増えていきます。この時点では
-割込みから復帰していないことに注意してください。割込みが有効になっているのでこれで
-問題はありません（割込みは`schedule`が呼ばれる前の[timer_tick](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L70)で
-有効になっています）。
-
+1. `cpu_switch_to` runs task 2. In order to do this, it executes exactly the same sequence of steps that it does for task 1. Task 2 started to execute and it stack grows. Note, that we didn't return from an interrupt at this point, but this is ok because interrupts now are enabled (interrupts have been enabled previously in [timer_tick](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L70) before `schedule` was called)
     ```
              0 +------------------------+
                | kernel image           |
@@ -727,10 +553,7 @@ calee保存レジスタをカーネルイメージ内にあるinitタスクの`c
                | device registers       |
     0x40000000 +------------------------+
     ```
-12. 別のタイマ割り込みが発生し、`kernel_entry`はすべての汎用レジスタと`elr_el1`、
-`spsr_el1`をタスク 2のスタックの下位アドレスに保存します。タスク 2の割り込み
-スタックが増え始めます。
-
+1. Another timer interrupt happens and `kernel_entry` saves all general purpose registers + `elr_el1` and `spsr_el1` at the bottom of task 2 stack. Task 2 interrupt stack begins to grow.
     ```
              0 +------------------------+
                | kernel image           |
@@ -765,21 +588,10 @@ calee保存レジスタをカーネルイメージ内にあるinitタスクの`c
                | device registers       |
     0x40000000 +------------------------+
     ```
-13. `schedule`が呼び出されます。すべてのタスクのカウンタが0になっていることを
-確認し、カウンタをタスク優先度に合わせて設定します。
-14. `schedule` はinitタスクを選択して実行します。(これはすべてのタスクのカウンタが
-1に設定されており、initタスクがリストの最初のタスクだからです)。しかし、実際には、
-`schedule`がこの時点でタスク1またはタスク2を選択することは完全に合法です。すべての
-タスクのカウンタ値は同じだからです。ここではタスク1が選択された場合に興味があるので
-それが起こったと仮定してみます。
-15. `cpu_switch_to`が呼び出され、タスク 1の`cpu_context`から以前に保存されていた
-callee保存レジスタを復元します。現在、リンクレジスタは[`sched.c#L63`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L63)を
-指しています。そこが、前回タスク 1の実行中に`cpu_switch_to`が呼び出された場所
-だからです。`sp`はタスク 1の割り込みスタックの底を指しています。
-16. `timer_tick`関数が[sched.c#L79](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L79)から実行を再開します。そして、割り込みを
-無効にし、最後に[kernel_exit](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L79)を実行します。`kernel_exit` が呼ばれるまでに、
-タスク 1 の割り込みスタックは0に戻されています。
-
+1. `schedule` is called. It observes that all tasks have their counters set to 0 and set counters to their tasks priorities.
+1. `schedule` selects init task to run. (This is because all tasks now have their counters set to 1 and init task is the first in the list). But actually, it would be fully legal for `schedule` to select task 1 or task 2 at this point, because their counters has equal values. We are more interested in the case when task 1 is selected so let's now assume that this is what had happened.
+1. `cpu_switch_to` is called and it restores previously saved callee-saved registers from task 1 `cpu_context`. Link register now points [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L63) because this is the place from which `cpu_switch_to` was called last time when task 1 was executed. `sp` points to the bottom of task 1 interrupt stack.
+1. `timer_tick` function resumes execution, starting from [this](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L79) line. It disables interrupts and finally [kernel_exit](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson04/src/sched.c#L79) is executed. By the time `kernel_exit` is called, task 1 interrupt stack is collapsed to 0.
     ```
              0 +------------------------+
                | kernel image           |
@@ -812,10 +624,7 @@ callee保存レジスタを復元します。現在、リンクレジスタは[`
                | device registers       |
     0x40000000 +------------------------+
     ```
-17. `kernel_exit`はすべての汎用レジスタと`elr_el1`、`spsr_el1`を復元します。
-`elr_el1`は`process`関数の真ん中のどこかを、`sp`はタスク 1のスタックの底を
-指しています。
-
+1. `kernel_exit` restores all general purpose registers as well as `elr_el1` and `spsr_el1`. `elr_el1` now points somewhere in the middle of the `process` function. `sp` points to the bottom of task 1 stack.
     ```
              0 +------------------------+
                | kernel image           |
@@ -846,25 +655,18 @@ callee保存レジスタを復元します。現在、リンクレジスタは[`
                | device registers       |
     0x40000000 +------------------------+
     ```
-18. `kernel_exit`は`eret`命令を実行し、`elr_el1`レジスタを使用して`process`
-関数にジャンプバックします。そして、タスク 1は、通常の実行を再開します。
+1. `kernel_exit` executes `eret` instruction which uses `elr_el1` register to jump back to `process` function. Task 1 resumes it normal execution.
 
-以上の一連の手順は非常に重要であり、個人的にはチュートリアル全体の中で最も重要な
-ものの一つだと考えています。もし、理解するのが難しい場合はこのレッスンの演習1を
-やってみることを勧めます。
+The described above sequence of steps is very important — I personally consider it one of the most important things in the whole tutorial. If you have difficulties with understanding it, I can advise you to work on the exercise number 1 from this lesson.
 
-### 結論
+### Conclusion
 
-スケジューリングができるようになりましたが、現在、カーネルが管理できるのは
-カーネルスレッドだけです。カーネルスレッドはEL1で実行され、カーネルの関数や
-データに直接アクセスできてしまいます。次の2つのレッスンでは、この問題を解決する
-ために、システムコールと仮想メモリを導入します。
+We are done with scheduling, but right now our kernel can manage only kernel threads: they are executed at EL1 and can directly access any kernel functions or data. In the next 2 lessons we are going fix this and introduce system calls and virtual memory.
 
+##### Previous Page
 
-##### 前ページ
+3.5 [Interrupt handling: Exercises](../../docs/lesson03/exercises.md)
 
-3.5 [割り込み処理: 演習](../../docs/lesson03/exercises.md)
+##### Next Page
 
-##### 次ページ
-
-4.2 [プロセススケジューラ: スケジューラの基本構造](../../docs/lesson04/linux/basic_structures.md)
+4.2 [Process scheduler: Scheduler basic structures](../../docs/lesson04/linux/basic_structures.md)

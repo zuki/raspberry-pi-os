@@ -1,25 +1,15 @@
-## 4.5: 演習
+## 4.5: Exercises
 
-1. すべての主なカーネル関数に`printf`を追加して、現在のメモリと
-プロセッサの状態に関する情報を出力してください。このレッスンの
-RPi OSパートの最後で示した状態図が正しいことを確認してください。
-（必ずしも毎回すべての状態を出力する必要はありませんが、何か大きな
-イベントが発生したときには、現在のスタックポインタや割り当てられた
-ばかりのオブジェクトのアドレス、その他必要に応じて何でも出力する
-ことができます。情報の氾濫を防ぐための仕組みを考えてください。)
-2. タスクに優先順位をつける方法を導入してください。優先度の高い
-タスクは、優先度の低いタスクよりも多くのプロセッサ時間を確保する
-ようにしてください。
-3. ユーザプロセスがFP/SIMDレジスタを使えるようにしてくだだい。それには
-これらのレジスタをタスクコンテキストに保存し、コンテキストスイッチの
-際にスワップする必要があります。
-5. カーネルが無制限にタスクを持てるようにしてください(現在の制限は64)。
-6. レッスン04をqemu上で実行できるようにしてください。[このissue](https://github.com/s-matyukevich/raspberry-pi-os/issues/8)を参考にしてください。
+1. Add `printf` to all main kernel functions to output information about the curent memory and processor state. Make sure that the state diagrams, that I've added to the end of the RPi OS part of this lesson, are correct.  (You do not necessarily need to output all state each time, but as soon as some major event happens you can output current stack pointer, or address of the object that has just been allocated, or whatever you consider necessary. Think about some mechanism to prevent information overflow) 
+1. Introduce a way to assign priority to the tasks. Make sure that a task with higher priority gets more processor time that the one with lower priority.
+1. Allow user processes to use FP/SIMD registers. Those registers should be saved in the task context and swapped during the context switch.
+1. Allow the kernel to have an unlimited number of tasks (right now the limit is 64). 
+1. Adopt lesson 04 to run on qemu. Check [this](https://github.com/s-matyukevich/raspberry-pi-os/issues/8) issue for reference.
 
-##### 前ページ
+##### Previous Page
 
-4.4 [プロセススケジューラ: スケジューラ](../../docs/lesson04/linux/scheduler.md)
+4.4 [Process scheduler: Scheduler](../../docs/lesson04/linux/scheduler.md)
 
-##### 次ページ
+##### Next Page
 
-5.1 [ユーザプロセスとシステムコール: RPi OS](../../docs/lesson05/rpi-os.md)
+5.1 [User processes and system calls: RPi OS](../../docs/lesson05/rpi-os.md)

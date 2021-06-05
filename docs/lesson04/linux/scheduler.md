@@ -1,97 +1,54 @@
-## 4.4: スケジューラ
+## 4.4: Scheduler
 
-Linuxのスケジューラの内部動作についてすでに多くのことを学んできましたので、
-残されているものはそれほど多くありません。本章では、全体像を把握するために、
-次の2つの重要なスケジューラのエントリポイントを見ていきます。
+We have already learned a lot of details about the Linux scheduler inner workings, so there is not so much left for us. To make the whole picture complete in this chapter we will take a look at 2 important scheduler entry points:
 
-1. [scheduler_tick()](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3003) タイマ割り込みごとに呼び出される関数。
-2. [schedule()](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3418) カレントタスクを再スケジュールする必要があるたびごとに呼び出される関数。
+1. [scheduler_tick()](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3003) function, which  is called at each timer interrupt.
+1. [schedule()](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3418) function, which is called each time when the current task needs to be rescheduled.
 
-この章で調査する3番めの主要なものはコンテキストスイッチという概念です。
-コンテキストスイッチとは、カレントタスクを中断して、代わりに別のタスクを実行する
-処理のことです。この処理はアーキテクチャに強く依存しており、RPi OSを動作させる
-際に私たちが行っていることに密接に関連します。
+The third major thing that we are going to investigate in this chapter is the concept of context switch. A context switch is the process that suspends the current task and runs another task instead - this process is highly architecture specific and closely correlates with what we have been doing when working with RPi OS.
 
 ### scheduler_tick
 
-この関数は次の2つの理由で重要です。
+This function is important for 2 reasons:
 
-1. スケジューラに時間統計とカレントタスクに関するランタイム情報を更新する
-方法を提供する。
-2. ランタイム情報をカレントタスクをプリエンプトするか否かの判断のために
-使用し、もしするのであれば、`schedule()`を呼び出す。
+1. It provides a way for the scheduler to update time statistics and runtime information for the current task.
+1. Runtime information then is used to determine whether the current task needs to be preempted, and if so `schedule()` function is called.
 
-これまで説明してきたほとんどの関数と同様に、`scheduler_tick`は複雑すぎて
-完全には説明できませんが、いつものように最も重要な部分だけを紹介します。
+As well as most of the previously explored functions, `scheduler_tick` is too complex to be fully explained - instead, as usual, I will just highlight the most important parts.
 
-1. 主な作業はCFSのメソッドである[task_tick_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L9044)で
-行われます。このメソッドはカレントタスクに対応する`sched_entity`の[entity_tick](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3990)を
-呼び出します。ソースコードを見ると、なぜカレント`sched_entry`に対して`entry_tick`を
-呼び出すのではなく、`for_each_sched_entity`マクロが使用されるのか不思議に思う
-かもしれません。`for_each_sched_entity`はシステムのすべての`sched_entry`に
-ついて処理するわけではありません。ルートまで`sched_entry`継承木を走査する
-だけです。これはタスクがグループ化されている場合に便利であり、特定のタスクの
-ランタイム情報を更新した後、グループ全体に対応する`sched_entry`も更新します。
+1. The main work is done inside CFS method [task_tick_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L9044). This method calls [entity_tick](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3990) for the `sched_entity` corresponding to the current task. When looking at the source code, you may be wondering why instead of just calling `entry_tick` for the current `sched_entry`, `for_each_sched_entity` macro is used instead?  `for_each_sched_entity` doesn't iterate over all `sched_entry` in the system. Instead, it only traverses the `sched_entry`  inheritance tree up to the root. This is useful when tasks are grouped - after updating runtime information for a particular task, `sched_entry` corresponding to the whole group is also updated.
 
-2. [entity_tick](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3990) は主に次の2つのことを行います。
-  * [update_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L827)を
-  呼び出します。これはタスクの`vruntime`の更新とランキューの`min_vruntime`を
-  更新します。ここで覚えておくべき重要なことは、`bruntime`は常に2つのこと、
-  すなわち、タスクが実際どのくらいな長く実行されているかとタスクの優先度に
-  基づいていることです。
-  * [check_preempt_tick](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3834)を
-  呼び出します。これはカレントタスクをプリエンプトする必要があるか否かを
-  チェックします。プリエンプトは次の2つの場合に起きます。
-    1. カレントタスクの実行時時間が長すぎる場合（比較は`vruntime`ではなく、
-   通常時間で行われます）。[リンク](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3842)
-    2. より小さな`vruntime`を持つタスクが存在し、`vruntime`値の差が閾値より
-   大きい場合。 [リンク](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3866)
+1. [entity_tick](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3990) does 2 main things:
+  * Calls [update_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L827), which is responsible for updating task's `vruntime` as well as runqueue's `min_vruntime`. An important thing to remember here is that `vruntime` is always based on 2 things: how long task has actually been executed and tasks priority.
+  * Calls [check_preempt_tick](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3834), which checks whether the current task needs to be preempted. Preemption happens in 2 cases:
+    1. If the current task has been running for too long (the comparison is made using normal time, not `vruntime`). [link](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3842)
+    1. If there is a task with smaller `vruntime` and the difference between `vruntime` values is greater than some threshold. [link](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3866)
 
-    どちらの場合も[resched_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L479)
-    関数を呼び出してカレントタスクにプリエンプトするためのマークを付けます。
+    In both cases the current task is marked for preemption by calling [resched_curr](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L479) function.
 
-`resched_curr`の呼び出しにより、カレントタスクに`TIF_NEED_RESCHED`フラグが
-設定され、最終的に`schedule`が呼び出されることは前章で既に見てきました。
+We have already seen in the previous chapter how calling `resched_curr` leads to `TIF_NEED_RESCHED` flag being set for the current task and eventually `schedule` being called.
 
-`schedule_tick`については以上です。これでようやく`schedule`関数を見ていく
-準備ができました。
+That's it about `schedule_tick` now we are finally ready to take a look at the `schedule` function.
 
 ### schedule
 
-`schedule`が使われている例はすでにたくさん見てきましたので、この関数が実際に
-どのように動作するのかを知りたいと思っているはずです。この関数の内部が思って
-いたよりシンプルであることを知って驚くでしょう。
+We have already seen so many examples were `schedule` is used, so now you are probably anxious to see how this function actually works. You will be surprised to know that the internals of this function are rather simple.
 
-1. 主な作業は[__schedule](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3278)関数で行われています。
-1. `__schedule`は[pick_next_task](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3199)を呼び出しますが、この関数は作業のほとんどをCFS
-スケジューラの[pick_next_task_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L6251)メソッドにリダイレクトします。
-2. ご想像のとおり、通常のケースでは`pick_next_task_fair`は赤黒木の最も左の要素を
-選択して返すだけです。これは[`fair.c#L3915`](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3915)で行われています。
-1. `__schedule`は次に[context_switch](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L2750)を呼び出します。この関数は準備作業をした後、
-アーキテクチャ固有の[__switch_to](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/process.c#L348)
-関数を呼び出します。そこではスイッチのための低レベルなアーキテクチャ固有のタスク
-パラメタが準備されます。
-2. `__switch_to`はまず、TLS (スレッドローカルストア)や浮動小数点/NEON保存レジスタ
-のような追加のタスクコンポーネントを切り替えます。
-3. 実際の切り替えはアセンブラの関数[cpu_switch_to](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L914)で行われています。この関数はすでに
-おなじみのはずです。ほとんど変更を加えずにRPi OSにコピーしたものだからです。
-覚えていると思いますが、この関数はcalleee-savedなレジスタとタスクスタックを
-切り替えます。この関数が復帰すると、新規タスクが独自のカーネルスタックを使って
-実行されます。
+1. The main work is done inside [__schedule](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3278)  function.
+1. `__schedule` calls [pick_next_task](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L3199) which redirect most of the work to the [pick_next_task_fair](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L6251) method of the CFS scheduler.
+1. As you might expect `pick_next_task_fair` in a normal case just selects the leftmost element from the red-black tree and returns it. It happens [here](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/fair.c#L3915).
+1. `__schedule` calls [context_switch](https://github.com/torvalds/linux/blob/v4.14/kernel/sched/core.c#L2750), which does some preparation work and calls architecture specific [__switch_to](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/process.c#L348) function, where low-level arch specific task parameters are prepared to the switch.
+1. `__switch_to` first switches some additional task components, like, for example, TLS (Thread-local Store) and saved floating point and NEON registers.
+1. Actual switch takes place in the assembler [cpu_switch_to](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/entry.S#L914) function. This function should be already familiar to you because I copied it almost without any changes to the RPi OS. As you might remember, this function switches callee-saved registers and task stack. After it returns, the new task will be running using its own kernel stack.
 
-### 結論
+### Conclusion
 
-これでLinuxのスケジューラについては終了です。非常に基本的なワークフローだけに
-集中すれば、それほど難しく思えないのは良かったです。基本的なワークフローを
-理解した後は、スケジュールコードの別のパスからさらに細部に注意を払いたくなる
-かもしれません。それは非常に沢山あるからです。しかし、私たちは現時点では現在の
-理解で満足しており、ユーザプロセスとシステムコールを説明する次のレッスンに
-移る準備ができています。
+Now we are done with the Linux scheduler. The good thing is that it appears to be not so difficult if you focus only on the very basic workflow. After you understand the basic workflow you probably might want to to make another path through the schedule code and pay more attention to the details, because there are so many of them. But for now, we are happy with our current understanding and ready to move to the following lesson, which describes user processes and system calls.
 
-##### 前ページ
+##### Previous Page
 
-4.3 [プロセススケジューラ: タスクをフォークする](../../../docs/lesson04/linux/fork.md)
+4.3 [Process scheduler: Forking a task](../../../docs/lesson04/linux/fork.md)
 
-##### 次ページ
+##### Next Page
 
-4.5 [プロセススケジューラ: 演習](../../../docs/lesson04/exercises.md)
+4.5 [Process scheduler: Exercises](../../../docs/lesson04/exercises.md)

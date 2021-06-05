@@ -1,19 +1,13 @@
-## 2.3: 演習
+## 2.3: Exercises
 
-1. EL3からEL1に直接ジャンプするのではなく、まずEL2に移行してからEL1に切り替える
-ようにしてください。
-2. FP/SIMDレジスタを使用した場合、EL3ではすべてうまくいきますが、EL1になるとすぐに
-プリント機能が動作しなくなるという問題がありました。そのため、コンパイラオプションに
-[-mgeneral-regs-only](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/Makefile#L3)パラメータを追加しました。まず、このパラメータを削除して、この動作を再現
-してみてください。次に、`objdump`ツールを使い`-mgeneral-regs-only`フラグがないとgccが
-FP/SIMDレジスタをどのように利用するかを確認してください。最後に、`cpacr_el1`を使って
-FP/SIMDレジスタが使えるようにしてください。
-3. レッスン02をqemu上で実行できるようにしてください。[このissue](https://github.com/s-matyukevich/raspberry-pi-os/issues/8)を参考にしてください。
+1. Instead of jumping directly from EL3 to EL1, try to get to EL2 first and only then switch to EL1. 
+1. One issue that I ran into when working on this lesson was that if FP/SIMD registers are used then everything works well at EL3, but as soon as you get to EL1 print function stops working. This was the reason why I've added [-mgeneral-regs-only](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/Makefile#L3) parameter to the compiler options. Now I want you to remove this parameter and reproduce this behavior. Next, you can use `objdump` tool to see how exactly gcc make use of FP/SIMD registers in the absence of `-mgeneral-regs-only` flag. Finally, I want you to use 'cpacr_el1' to allow using FP/SIMD registers.
+1. Adapt lesson 02 to run on qemu. Check [this](https://github.com/s-matyukevich/raspberry-pi-os/issues/8) issue for reference.
 
-##### 前ページ
+##### Previous Page
 
-2.2 [プロセッサの初期化: Linux](../../docs/lesson02/linux.md)
+2.2 [Processor initialization: Linux](../../docs/lesson02/linux.md)
 
-##### 次ページ
+##### Next Page
 
-3.1 [割り込み処理: RPi OS](../../docs/lesson03/rpi-os.md)
+3.1 [Interrupt handling: RPi OS](../../docs/lesson03/rpi-os.md)
