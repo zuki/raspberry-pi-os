@@ -10,8 +10,8 @@
 
 ##### 前ページ
 
-5.2 [ユーザプロセスとシステムコール: Linux](../../docs/lesson05/linux.md)
+5.2 [ユーザプロセスとシステムコール: Linux](../../ja/lesson05/linux.md)
 
 ##### 次ページ
 
-6.1 [仮想メモリ管理: RPi OS](../../docs/lesson06/rpi-os.md)
+6.1 [仮想メモリ管理: RPi OS](../../ja/lesson06/rpi-os.md)

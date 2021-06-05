@@ -271,8 +271,8 @@ Exception level: 1
 
 ##### 前ページ
 
-1.5 [カーネルの初期化: 演習](../../docs/lesson01/exercises.md)
+1.5 [カーネルの初期化: 演習](../../ja/lesson01/exercises.md)
 
 ##### 次ページ
 
-2.2 [プロセッサの初期化: Linux](../../docs/lesson02/linux.md)
+2.2 [プロセッサの初期化: Linux](../../ja/lesson02/linux.md)

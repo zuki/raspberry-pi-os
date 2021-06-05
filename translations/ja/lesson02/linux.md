@@ -397,8 +397,8 @@ OSにとって重要なトピックである割り込み処理について調べ
 
 ##### 前ページ
 
-2.1 [プロセッサの初期化: RPi OS](../../docs/lesson02/rpi-os.md)
+2.1 [プロセッサの初期化: RPi OS](../../ja/lesson02/rpi-os.md)
 
 ##### 次ページ
 
-2.3 [プロセッサの初期化: 演習](../../docs/lesson02/exercises.md)
+2.3 [プロセッサの初期化: 演習](../../ja/lesson02/exercises.md)

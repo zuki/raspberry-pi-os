@@ -18,8 +18,8 @@
 
 ##### 前ページ
 
-1.4 [カーネル初期化: Linuxの起動シーケンス](../../docs/lesson01/linux/kernel-startup.md)
+1.4 [カーネル初期化: Linuxの起動シーケンス](../../ja/lesson01/linux/kernel-startup.md)
 
 ##### 次ページ
 
-2.1 [プロセッサ初期化: RPi OS](../../docs/lesson02/rpi-os.md)
+2.1 [プロセッサ初期化: RPi OS](../../ja/lesson02/rpi-os.md)

@@ -183,7 +183,7 @@ The first two lines of the macro are responsible for extracting table index from
     add    \tmp2, \tbl, #PAGE_SIZE
 ```
 
-Then the address of the next page table is calculated. Here we are using the convention that all our initial page tables are located in one continuous memory region. We simply assume that the next page table in the hierarchy will be adjacent to the current page table. 
+Then the address of the next page table is calculated. Here we are using the convention that all our initial page tables are located in one continuous memory region. We simply assume that the next page table in the hierarchy will be adjacent to the current page table.
 
 ```
     orr    \tmp2, \tmp2, #MM_TYPE_PAGE_TABLE
@@ -498,7 +498,7 @@ void map_page(struct task_struct *task, unsigned long va, unsigned long page){
 
 `map_page` in some way duplicates what we've been doing in the `__create_page_tables` function: it allocates and populates a page table hierarchy. There are 3 important difference, however: now we are doing this in C, instead of assembler. `map_page` maps a single page, instead of the whole memory, and use normal page mapping, instead of section mapping.
 
-There are 2 important functions involved in the process:  [map_table](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L47) and [map_table_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L40). 
+There are 2 important functions involved in the process:  [map_table](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L47) and [map_table_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L40).
 
 `map_table` is listed below.
 
@@ -539,7 +539,7 @@ void map_table_entry(unsigned long *pte, unsigned long va, unsigned long pa) {
 }
 ```
 
-`map_table_entry` extracts PTE index from the virtual address and then prepares and sets PTE descriptor. It is similar to what we've been doing in the `create_block_map` macro. 
+`map_table_entry` extracts PTE index from the virtual address and then prepares and sets PTE descriptor. It is similar to what we've been doing in the `create_block_map` macro.
 
 That's it about user page tables allocation, but `map_page` is responsible for one more important role: it keeps track of the pages that have been allocated during the process of virtual address mapping. All such pages are stored in the [kernel_pages](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/sched.h#L53) array. We need this array to be able to clean up allocated pages after a task exits. There is also [user_pages](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/sched.h#L51) array, which is also populated by the `map_page` function. This array store information about the correspondence between process virtual pages any physical pages. We need this information in order to be able to copy process virtual memory during `fork` (More on this later).
 
@@ -560,7 +560,7 @@ void loop(char* str)
     }
 }
 
-void user_process() 
+void user_process()
 {
     call_sys_write("User process\n\r");
     int pid = call_sys_fork();
@@ -575,7 +575,7 @@ void user_process()
         loop("12345");
     }
 }
-``` 
+```
 
 The code itself is very simple. The only tricky part is the semantics of the `fork` system call. Unlike `clone`, when doing `fork` we don't need to provide the function that needs to be executed in a new process. Also, the [fork wrapper function](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/user_sys.S#L26) is much easier than the `clone` one. All of this is possible because of the fact that `fork` make a full copy of the process virtual address space, so the fork wrapper function return twice: one time in the original process and one time in the new one. At this point, we have two identical processes, with identical stacks and `pc` positions. The only difference is the return value of the `fork` syscall: it returns child PID in the parent process and 0 in the child process. Starting from this point both processes begin completely independent life and can modify their stacks and write different things using same addresses in memory - all of this without affecting one another.
 
@@ -707,9 +707,9 @@ This was a long and difficult chapter, but I hope it was useful as well. Virtual
 
 ##### Previous Page
 
-5.3 [User processes and system calls: Exercises](../../docs/lesson05/exercises.md)
+5.3 [User processes and system calls: Exercises](../../ja/lesson05/exercises.md)
 
 ##### Next Page
 
-6.2 Virtual memory management: Linux (in progress)  
-6.3 jump forward to [Virtual memory management: Exercises](../../docs/lesson06/exercises.md)
+6.2 Virtual memory management: Linux (in progress)
+6.3 jump forward to [Virtual memory management: Exercises](../../ja/lesson06/exercises.md)

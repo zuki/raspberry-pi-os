@@ -24,7 +24,7 @@ struct bcm2835_timer {
 };
 ```
 
-This structure contains all state needed for the driver to function. `control` and `compare` fields holds the addresses of the corresponding memory mapped registers, `match_mask` is used to determine which of the 4 available timer interrupts we are going to use, `evt` field contains a structure that is passed to clock events framework and `act` is an irq action that is used to connect the current driver with the interrupt controller. 
+This structure contains all state needed for the driver to function. `control` and `compare` fields holds the addresses of the corresponding memory mapped registers, `match_mask` is used to determine which of the 4 available timer interrupts we are going to use, `evt` field contains a structure that is passed to clock events framework and `act` is an irq action that is used to connect the current driver with the interrupt controller.
 
 Next we are going to look at [bcm2835_timer_init](https://github.com/torvalds/linux/blob/v4.14/drivers/clocksource/bcm2835_timer.c#L83) which is the driver initialization function. It is large, but not as difficult as you might think from the beginning.
 
@@ -218,7 +218,7 @@ Now let me show you the chain of function calls that leads us to the place we ne
 
 1. [clockevents_config_and_register](https://github.com/torvalds/linux/blob/v4.14/kernel/time/clockevents.c#L504) This is the top level initialization function.
 1. [clockevents_register_device](https://github.com/torvalds/linux/blob/v4.14/kernel/time/clockevents.c#L449) In this function the timer is added to the global list of clock event devices.
-1. [tick_check_new_device](https://github.com/torvalds/linux/blob/v4.14/kernel/time/tick-common.c#L300)  This function checks whether the current device is a good candidate to be used as a "tick device". If yes, such device will be used to generate periodic ticks that the rest of the kernel will use to do all work that needs to be done on a regular basis. 
+1. [tick_check_new_device](https://github.com/torvalds/linux/blob/v4.14/kernel/time/tick-common.c#L300)  This function checks whether the current device is a good candidate to be used as a "tick device". If yes, such device will be used to generate periodic ticks that the rest of the kernel will use to do all work that needs to be done on a regular basis.
 1. [tick_setup_device](https://github.com/torvalds/linux/blob/v4.14/kernel/time/tick-common.c#L177) This function starts device configuration.
 1. [tick_setup_periodic](https://github.com/torvalds/linux/blob/v4.14/kernel/time/tick-common.c#L144) This is the place were device is configured for periodic tics.
 1. [tick_set_periodic_handler](https://github.com/torvalds/linux/blob/v4.14/kernel/time/tick-broadcast.c#L432)  Finally we reached the place where the handler is assigned!
@@ -261,8 +261,8 @@ Now you see how long is the way of an ordinary timer interrupt, but we followed 
 
 ##### Previous Page
 
-3.3 [Interrupt handling: Interrupt controllers](../../../docs/lesson03/linux/interrupt_controllers.md)
+3.3 [Interrupt handling: Interrupt controllers](../../../ja/lesson03/linux/interrupt_controllers.md)
 
 ##### Next Page
 
-3.5 [Interrupt handling: Exercises](../../../docs/lesson03/exercises.md)
+3.5 [Interrupt handling: Exercises](../../../ja/lesson03/exercises.md)

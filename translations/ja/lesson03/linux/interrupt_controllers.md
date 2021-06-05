@@ -179,7 +179,7 @@ This function reads `LOCAL_IRQ_PENDING` register to figure out what interrupts a
 
 This is were interrupt is passed to the next handler. First of all hardware irq number is calculated. [ffs](https://github.com/torvalds/linux/blob/v4.14/include/asm-generic/bitops/ffs.h#L13) (Find first bit) function is used to do this. After hardware irq number is calculated [handle_domain_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/irqdesc.c#L622) function is called. This function uses irq domain to translate hardware irq number to Linux irq number, then checks irq configuration (it is stored in [irq_desc](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdesc.h#L55) struct) and calls an interrupt handler. We've seen that the handler was set to [handle_percpu_devid_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L859). However, this handler will be overwritten by the child interrupt controller later. Now, let's examine how this happens.
 
-### Generic interrupt controller 
+### Generic interrupt controller
 
 We have already seen how to use device tree and `compatible` property to find the driver corresponding to some device, so I am going to skip this part and jump straight to the generic interrupt controller driver source code. You can find it in [irq-bcm2835.c](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c) file. As usual, we are going to start our exploration with the initialization function. It is called [armctrl_of_init](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L141).
 
@@ -306,8 +306,8 @@ You can think about this code as an advanced version of what we did [here](https
 
 ##### Previous Page
 
-3.2 [Interrupt handling: Low-level exception handling in Linux](../../../docs/lesson03/linux/low_level-exception_handling.md)
+3.2 [Interrupt handling: Low-level exception handling in Linux](../../../ja/lesson03/linux/low_level-exception_handling.md)
 
 ##### Next Page
 
-3.4 [Interrupt handling: Timers](../../../docs/lesson03/linux/timer.md)
+3.4 [Interrupt handling: Timers](../../../ja/lesson03/linux/timer.md)

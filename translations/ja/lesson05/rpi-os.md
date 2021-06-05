@@ -462,8 +462,8 @@ RPi OSがユーザータスクを管理できるようになったことで、�
 
 ##### 前ページ
 
-4.5 [プロセススケジューラ: 演習](../../docs/lesson04/exercises.md)
+4.5 [プロセススケジューラ: 演習](../../ja/lesson04/exercises.md)
 
 ##### 次ページ
 
-5.2 [ユーザプロセスとシステムコール: Linux](../../docs/lesson05/linux.md)
+5.2 [ユーザプロセスとシステムコール: Linux](../../ja/lesson05/linux.md)

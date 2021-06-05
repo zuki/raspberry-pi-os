@@ -12,8 +12,8 @@ FP/SIMDレジスタが使えるようにしてください。
 
 ##### 前ページ
 
-2.2 [プロセッサの初期化: Linux](../../docs/lesson02/linux.md)
+2.2 [プロセッサの初期化: Linux](../../ja/lesson02/linux.md)
 
 ##### 次ページ
 
-3.1 [割り込み処理: RPi OS](../../docs/lesson03/rpi-os.md)
+3.1 [割り込み処理: RPi OS](../../ja/lesson03/rpi-os.md)

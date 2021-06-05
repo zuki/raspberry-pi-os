@@ -365,8 +365,8 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
 
 ##### 前ページ
 
-1.2 [カーネルの初期化: Linuxプロジェクトの構造](../../../docs/lesson01/linux/project-structure.md)
+1.2 [カーネルの初期化: Linuxプロジェクトの構造](../../../ja/lesson01/linux/project-structure.md)
 
 ##### 次ページ
 
-1.4 [カーネルの初期化: Linux起動シーケンス](../../../docs/lesson01/linux/kernel-startup.md)
+1.4 [カーネルの初期化: Linux起動シーケンス](../../../ja/lesson01/linux/kernel-startup.md)

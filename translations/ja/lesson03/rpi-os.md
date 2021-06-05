@@ -323,8 +323,8 @@ void handle_timer_irq( void )
 
 ##### 前ページ
 
-2.3 [プロセッサの初期化: 演習](../../docs/lesson02/exercises.md)
+2.3 [プロセッサの初期化: 演習](../../ja/lesson02/exercises.md)
 
 ##### 次ページ
 
-3.2 [割り込み処理: Linuxにおける低レベル割り込み処理](../../docs/lesson03/linux/low_level-exception_handling.md)
+3.2 [割り込み処理: Linuxにおける低レベル割り込み処理](../../ja/lesson03/linux/low_level-exception_handling.md)

@@ -284,8 +284,8 @@ ret_fast_syscall:
 
 ##### 前ページ
 
-5.1 [ユーザプロセスとシステムコール: RPi OS](../../docs/lesson05/rpi-os.md)
+5.1 [ユーザプロセスとシステムコール: RPi OS](../../ja/lesson05/rpi-os.md)
 
 ##### 次ページ
 
-5.3 [ユーザプロセスとシステムコール: 演習](../../docs/lesson05/exercises.md)
+5.3 [ユーザプロセスとシステムコール: 演習](../../ja/lesson05/exercises.md)

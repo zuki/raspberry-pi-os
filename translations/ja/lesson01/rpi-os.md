@@ -707,8 +707,8 @@ disable_commandline_tags=1
 
 ##### 前ページ
 
-[前提条件](../../docs/Prerequisites.md)
+[前提条件](../../ja/Prerequisites.md)
 
 ##### 次ページ
 
-1.2 [カーネルの初期化: Linuxプロジェクトの構成](../../docs/lesson01/linux/project-structure.md)
+1.2 [カーネルの初期化: Linuxプロジェクトの構成](../../ja/lesson01/linux/project-structure.md)

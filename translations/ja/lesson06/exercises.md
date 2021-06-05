@@ -4,8 +4,8 @@
 
 ##### Previous Page
 
-6.2 Virtual memory management: Linux (in progress)  
-6.1 jump backward to [Virtual memory management: RPi OS](../../docs/lesson06/rpi-os.md)  
+6.2 Virtual memory management: Linux (in progress)
+6.1 jump backward to [Virtual memory management: RPi OS](../../ja/lesson06/rpi-os.md)
 
 ##### Next Page
 

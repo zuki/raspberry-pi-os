@@ -240,8 +240,8 @@ p->thread.cpu_context.sp = (unsigned long)childregs;
 
 ##### 前ページ
 
-4.2 [プロセススケジューラ: スケジューラの基本構造体](../../../docs/lesson04/linux/basic_structures.md)
+4.2 [プロセススケジューラ: スケジューラの基本構造体](../../../ja/lesson04/linux/basic_structures.md)
 
 ##### 次ページ
 
-4.4 [プロセススケジューラ: スケジューラ](../../../docs/lesson04/linux/scheduler.md)
+4.4 [プロセススケジューラ: スケジューラ](../../../ja/lesson04/linux/scheduler.md)

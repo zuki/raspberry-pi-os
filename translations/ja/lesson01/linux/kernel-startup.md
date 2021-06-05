@@ -174,8 +174,8 @@ compatible = "brcm,bcm2835-aux-uart";
 
 ##### 前ページ
 
-1.3 [カーネルの初期化: カーネルビルドシステム](../../../docs/lesson01/linux/build-system.md)
+1.3 [カーネルの初期化: カーネルビルドシステム](../../../ja/lesson01/linux/build-system.md)
 
 ##### 次ページ
 
-1.5 [カーネルの初期化: 演習](../../../docs/lesson01/exercises.md)
+1.5 [カーネルの初期化: 演習](../../../ja/lesson01/exercises.md)

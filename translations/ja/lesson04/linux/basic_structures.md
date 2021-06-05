@@ -133,8 +133,8 @@ CFS固有のすべての情報は[cfs_rq](https://github.com/torvalds/linux/blob
 
 ##### 前ページ
 
-4.1 [プロセススケジューラ: RPi OSスケジューラ](../../../docs/lesson04/rpi-os.md)
+4.1 [プロセススケジューラ: RPi OSスケジューラ](../../../ja/lesson04/rpi-os.md)
 
 ##### 次ページ
 
-4.3 [プロセススケジューラ: タスクをフォークする](../../../docs/lesson04/linux/fork.md)
+4.3 [プロセススケジューラ: タスクをフォークする](../../../ja/lesson04/linux/fork.md)

@@ -863,8 +863,8 @@ callee保存レジスタを復元します。現在、リンクレジスタは[`
 
 ##### 前ページ
 
-3.5 [割り込み処理: 演習](../../docs/lesson03/exercises.md)
+3.5 [割り込み処理: 演習](../../ja/lesson03/exercises.md)
 
 ##### 次ページ
 
-4.2 [プロセススケジューラ: スケジューラの基本構造](../../docs/lesson04/linux/basic_structures.md)
+4.2 [プロセススケジューラ: スケジューラの基本構造](../../ja/lesson04/linux/basic_structures.md)

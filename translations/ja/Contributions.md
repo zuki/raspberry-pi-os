@@ -6,7 +6,7 @@ The general workflow is the following:
 1. In comments claim that you want to take over the issue. The first person who does this will be assigned to the issue.
 1. [Fork the repository](https://help.github.com/articles/fork-a-repo/).
 1. Make all necessary changes.
-1. [Send a pull request](https://help.github.com/articles/about-pull-requests/). 
+1. [Send a pull request](https://help.github.com/articles/about-pull-requests/).
 1. After a review, your changes will be merged.
 
 The following types of contributions are particularly useful for the project.
@@ -25,8 +25,8 @@ If you successfully completed any of the exercises you can share your source cod
 
 ##### Previous Page
 
-[Introduction](../docs/Introduction.md)
+[Introduction](../ja/Introduction.md)
 
 ##### Next Page
 
-[Prerequisites](../docs/Prerequisites.md)
+[Prerequisites](../ja/Prerequisites.md)

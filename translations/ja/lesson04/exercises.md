@@ -18,8 +18,8 @@ RPi OSパートの最後で示した状態図が正しいことを確認して�
 
 ##### 前ページ
 
-4.4 [プロセススケジューラ: スケジューラ](../../docs/lesson04/linux/scheduler.md)
+4.4 [プロセススケジューラ: スケジューラ](../../ja/lesson04/linux/scheduler.md)
 
 ##### 次ページ
 
-5.1 [ユーザプロセスとシステムコール: RPi OS](../../docs/lesson05/rpi-os.md)
+5.1 [ユーザプロセスとシステムコール: RPi OS](../../ja/lesson05/rpi-os.md)

@@ -10,8 +10,8 @@
 
 ##### 前ページ
 
-3.4 [割り込み処理: タイマ](../../docs/lesson03/linux/timer.md)
+3.4 [割り込み処理: タイマ](../../ja/lesson03/linux/timer.md)
 
 ##### 次ページ
 
-4.1 [プロセススケジューラ: RPi OSスケジューラ](../../docs/lesson04/rpi-os.md)
+4.1 [プロセススケジューラ: RPi OSスケジューラ](../../ja/lesson04/rpi-os.md)
