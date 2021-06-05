@@ -1,64 +1,90 @@
-## 2.2: Processor initialization (Linux)
+## 2.2: プロセッサの初期化 (Linux)
 
-We stopped our exploration of the Linux kernel at [stext](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L116) function, which is the entry point of `arm64` architecture. This time we are going to go a little bit deeper and find some similarities with the code that we have already implemented in this and previous lessons. 
+私たちのLinuxカーネルの探究は、`arm64`アーキテクチャのエントリーポイントである
+[stext](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L116)関数で
+止まっていました。今回は、もう少し深く掘り下げて、今回と前回のレッスンで
+すでに実装したコードとの類似点を探してみましょう。
 
-You may find this chapter a little bit boring because it mostly discusses different ARM system registers and how they are used in the Linux kernel. But I still consider it very important for the following reasons:
+この章は少し退屈に思うかもしれません。さまざまなARMシステムレジスタと
+それらがLinuxカーネルでどのように使用されているかに関する説明が中心だから
+です。しかし、私は以下の理由からこの章が非常に重要だと考えます。
 
-1. It is necessary to understand the interface that the hardware provides to the software. Just by knowing this interface you will be able, in many cases, to deconstruct how a particular kernel feature is implemented and how software and hardware collaborate to implement this feature.
-1. Different options in the system register are usually related to enabling/disabling various hardware features. If you learn what different system registers an ARM processor have you will already have an idea what kind of functionality it supports.
+1. ハードウェアがソフトウェアに提供するインターフェースを理解する必要が
+あります。このインターフェースを知っているだけで、多くの場合、特定のカーネル
+機能がどのように実装されているか、この機能を実装するためにソフトウェアと
+ハードウェアがどのように協力してしているかを分析することができます。
+2. システムレジスタのさまざまなオプションは、通常、さまざまなハードウェア
+機能の有効化/無効化に関連しています。ARMプロセッサがどのようなシステム
+レジスタを持っているかを知れば、そのプロセッサがどのような機能をサポート
+しているかがわかります。
 
-Ok, now let's resume our investigation of the `stext` function.
+それでは、`stext`機能の調査を再開しましょう。
 
 ```
 ENTRY(stext)
     bl    preserve_boot_args
-    bl    el2_setup            // Drop to EL1, w0=cpu_boot_mode
+    bl    el2_setup            // EL1に移行する, w0=cpu_boot_mode
     adrp    x23, __PHYS_OFFSET
-    and    x23, x23, MIN_KIMG_ALIGN - 1    // KASLR offset, defaults to 0
+    and    x23, x23, MIN_KIMG_ALIGN - 1    // KASLRオフセット、デフォルトは0
     bl    set_cpu_boot_mode_flag
     bl    __create_page_tables
     /*
-     * The following calls CPU setup code, see arch/arm64/mm/proc.S for
-     * details.
-     * On return, the CPU will be ready for the MMU to be turned on and
-     * the TCR will have been set.
+     * 以下はCPUの設定コードを呼び出す。詳細はarch/arm64/mm/proc.Sを
+     * 参照のこと。
+     * 復帰時には、CPUはMMUを有効にする準備ができており、
+     * TCRが設定されている。
      */
-    bl    __cpu_setup            // initialise processor
+    bl    __cpu_setup            // プロセッサを初期化する
     b    __primary_switch
 ENDPROC(stext)
-``` 
+```
 
 ### preserve_boot_args
 
-[preserve_boot_args](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L136) function is responsible for saving parameters, passed to the kernel by the bootloader. 
+[preserve_boot_args](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L136)関数は
+ブートローダからカーネルに渡されたパラメータを保存します。
 
 ```
 preserve_boot_args:
     mov    x21, x0                // x21=FDT
 
-    adr_l    x0, boot_args            // record the contents of
-    stp    x21, x1, [x0]            // x0 .. x3 at kernel entry
+    adr_l    x0, boot_args        // カーネルエントリ時の
+    stp    x21, x1, [x0]          // x0 .. x3の内容を記録する
     stp    x2, x3, [x0, #16]
 
-    dmb    sy                // needed before dc ivac with
-                        // MMU off
+    dmb    sy                     // MMUオフのデータキャッシュを
+                                  // 破棄する前に必要
 
-    mov    x1, #0x20            // 4 x 8 bytes
-    b    __inval_dcache_area        // tail call
+    mov    x1, #0x20              // 4 x 8 bytes
+    b    __inval_dcache_area      // tail call
 ENDPROC(preserve_boot_args)
 ```
 
-Accordingly to the [kernel boot protocol](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt#L150), parameters are passed to the kernel in registers `x0 - x3`. `x0` contains the physical address of device tree blob (`.dtb`) in system RAM. `x1 - x3` are reserved for future usage. What this function is doing is copying the content of `x0 - x3` registers to the [boot_args](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/setup.c#L93) array and then [invalidate](https://developer.arm.com/docs/den0024/latest/caches/cache-maintenance) the corresponding cache line from the data cache. Cache maintenance in a multiprocessor system is a large topic on its own, and we are going to skip it for now. For those who are interested in this subject, I can recommend reading [Caches](https://developer.arm.com/docs/den0024/latest/caches) and [Multi-core processors](https://developer.arm.com/docs/den0024/latest/multi-core-processors) chapters of the `ARM Programmer’s Guide`.
+[カーネルブートプロトコル](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt#L150)によるとパラメータはレジスタ`x0 - x3`
+によりカーネルに渡されます。`x0`にはデバイスツリーブロブ（`.dtb`）のシステム
+RAMにおける物理アドレスが格納されます。`x1 - x3`は将来のために予約されて
+います。この関数が行っていることはレジスタ`x0 - x3`の内容を[boot_args](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/setup.c#L93)
+配列にコピーし、データキャッシュから対応するキャッシュラインを[破棄する](https://developer.arm.com/docs/den0024/latest/caches/cache-maintenance)
+ことです。マルチプロセッサシステムにおけるキャッシュメンテナンスについては、
+それ自体が大きなテーマであるため、今回は省略します。このテーマに興味のある方
+には「ARMプログラマガイド」の[Caches](https://developer.arm.com/docs/den0024/latest/caches)と [Multi-core processors](https://developer.arm.com/docs/den0024/latest/multi-core-processors)の章を読むことを勧めます。
 
 ### el2_setup
 
-Accordingly to the [arm64boot protocol](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt#L159), the kernel can be booted in either EL1 or EL2. In the second case, the kernel has access to the virtualization extensions and is able to act as a host operating system. If we are lucky enough to be booted in EL2, [el2_setup](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L386) function is called. It is responsible for configuring different parameters, accessible only at EL2, and dropping to EL1. Now I am going to split this function into small parts and explain each piece one by one.
+a[arm64boot protocol](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt#L159)によると
+カーネルはEL1とEL2のいずれかで起動することができます。後者の場合、カーネルは
+仮想化拡張機能にアクセスでき、ホストOSとして動作することができます。幸運にも
+EL2で起動できた場合は、[el2_setup](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L386)
+関数が呼び出されます。この関数はEL2しかアクセスできないさまざまなパラメータを
+設定し、EL1に移行する役割を担っています。以下、この関数をいくつかの部分に
+分けて、1つ1つ説明していきます。
 
 ```
-    msr    SPsel, #1            // We want to use SP_EL{1,2}
-``` 
+    msr    SPsel, #1            // SP_EL{1,2}を使用する
+```
 
-Dedicated stack pointer will be used for both EL1 and EL2. Another option is to reuse stack pointer from EL0.
+EL1とEL2で専用のスタックポインタを使用します。EL0のスタックポインタを再利用
+する別の選択肢もあります。
 
 ```
     mrs    x0, CurrentEL
@@ -66,194 +92,243 @@ Dedicated stack pointer will be used for both EL1 and EL2. Another option is to 
     b.eq    1f
 ```
 
-Only if current EL is EL2 branch to label `1`, otherwise we can't do EL2 setup and not much is left to be done in this function.
+現在のELがEL2の場合のみラベル`1`に分岐します。そうでない場合はEL2の設定が
+できないので、この関数にできることはそれほどありません。
 
 ```
     mrs    x0, sctlr_el1
-CPU_BE(    orr    x0, x0, #(3 << 24)    )    // Set the EE and E0E bits for EL1
-CPU_LE(    bic    x0, x0, #(3 << 24)    )    // Clear the EE and E0E bits for EL1
+CPU_BE(    orr    x0, x0, #(3 << 24)    )    // EL1のEEビットとE0EビットをセットCPU_LE(    bic    x0, x0, #(3 << 24)    )    // EL1のEEビットとE0Eビットをクリア
     msr    sctlr_el1, x0
-    mov    w0, #BOOT_CPU_MODE_EL1        // This cpu booted in EL1
+    mov    w0, #BOOT_CPU_MODE_EL1            // このCPUはEL1でブート
     isb
     ret
 ```
 
-If it happens that we execute at EL1, `sctlr_el1` register is updated so that CPU works in either `big-endian` of `little-endian` mode depending on the value of [CPU_BIG_ENDIAN](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/Kconfig#L612) config setting. Then we just exit from the `el2_setup` function and return [BOOT_CPU_MODE_EL1](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/virt.h#L55) constant. Accordingly to [ARM64 Function Calling Conventions](http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf) return value should be placed in `x0` register (or `w0` in our case. You can think about `w0` register as the first 32 bit of `x0`.).
+EL1で実行することになった場合は、CPUが「ビッグエンディアン」と
+「リトルエンディアン」のいずれかで動作するように[CPU_BIG_ENDIAN](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/Kconfig#L612)
+構成設定値を設定して`sctlr_el1`レジスタを更新します。そして、`el2_setup`関数を
+終了して、[BOOT_CPU_MODE_EL1](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/virt.h#L55)定数を返します[ARM64の関数呼び出し規約](http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf)に従い、返り値は`x0`レジスタ(ここでは`w0`。`w0`レジスタは、`x0`の最初の32ビットと
+考えることができます)に入れる必要があります。
 
 ```
 1:    mrs    x0, sctlr_el2
-CPU_BE(    orr    x0, x0, #(1 << 25)    )    // Set the EE bit for EL2
-CPU_LE(    bic    x0, x0, #(1 << 25)    )    // Clear the EE bit for EL2
+CPU_BE(    orr    x0, x0, #(1 << 25)    )    // EL2のEEビットをセット
+CPU_LE(    bic    x0, x0, #(1 << 25)    )    // EL2のEEビットをクリア
     msr    sctlr_el2, x0
 ```
 
-If it appears that we are booted in EL2 we are doing the same kind of setup for EL2 (note that this time `sctlr_el2` register is used instead of `sctlr_el1`.).
+EL2で起動した場合は、EL2用に同じような設定をします（今回は`sctlr_el1`ではなく、`sctlr_el2`レジスタを使用していることに注意してください）。
 
 ```
 #ifdef CONFIG_ARM64_VHE
     /*
-     * Check for VHE being present. For the rest of the EL2 setup,
-     * x2 being non-zero indicates that we do have VHE, and that the
-     * kernel is intended to run at EL2.
+     * VHEがあるかチェック。EL2設定の残りの部分において
+     * x2が非ゼロはVHEがあり、カーネルはEL2で実行しようと
+     * していることを示す。
      */
-    mrs    x2, id_aa64mmfr1_el1
-    ubfx    x2, x2, #8, #4
+    mrs    x2, id_aa64mmfr1_el1     // ID_AA64MMFR1_EL1のVH: [11:8]ビットを
+    ubfx    x2, x2, #8, #4          // 抽出。VHEをサポートしていれば0x1
 #else
     mov    x2, xzr
 #endif
 ```
 
-If [Virtualization Host Extensions (VHE)](https://developer.arm.com/products/architecture/a-profile/docs/100942/latest/aarch64-virtualization) is enabled via [ARM64_VHE](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/Kconfig#L926) config variable and the host machine supports them, `x2` then is updated with non zero value. `x2` will be used to check whether `VHE` is enabled later in the same function.
+[ARM64_VHE](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/Kconfig#L926)
+構成変数で[VHE （仮想化ホスト拡張）](https://developer.arm.com/products/architecture/a-profile/docs/100942/latest/aarch64-virtualization)が
+有効になっており、ホストマシンがそれをサポートしている場合、`x2`を0以外の
+値で更新します。`x2`は同じ関数で後ほど`VHE`が有効になっているか確認する
+時に使用されます。
 
 ```
     mov    x0, #HCR_RW            // 64-bit EL1
     cbz    x2, set_hcr
-    orr    x0, x0, #HCR_TGE        // Enable Host Extensions
+    orr    x0, x0, #HCR_TGE       // ホスト拡張を有効化
     orr    x0, x0, #HCR_E2H
 set_hcr:
     msr    hcr_el2, x0
     isb
 ```
 
-Here we set `hcr_el2` register. We used the same register to set 64-bit execution mode for EL1 in the RPi OS. This is exactly what is done in the first line of the provided code sample. Also if `x2 != 0`, which means that VHE is available and the kernel is configured to use it, `hcr_el2` is also used to enable VHE.
+ここでは`hcr_el2`レジスタを設定しています。RPi OSでは同じレジスタを使って
+EL1に64ビット実行モードを設定しました。それは上のコードサンプルの1行目で
+行っていることと全く同じです。また、`x2 != 0`、つまりVHEが使用可能かつ
+カーネルがそれを使用するように設定されている場合、`hcr_el2`を使って
+VHEも有効にしています。
 
 ```
     /*
-     * Allow Non-secure EL1 and EL0 to access physical timer and counter.
-     * This is not necessary for VHE, since the host kernel runs in EL2,
-     * and EL0 accesses are configured in the later stage of boot process.
-     * Note that when HCR_EL2.E2H == 1, CNTHCTL_EL2 has the same bit layout
-     * as CNTKCTL_EL1, and CNTKCTL_EL1 accessing instructions are redefined
-     * to access CNTHCTL_EL2. This allows the kernel designed to run at EL1
-     * to transparently mess with the EL0 bits via CNTKCTL_EL1 access in
-     * EL2.
+     * セキュアでないEL1とEL0に物理的なタイマとカウンタへのアクセスを許可する。
+     * VHEの場合はこれは不要である。ホストカーネルはEL2で動作し、EL0のアクセスは
+     * ブートプロセスの後段で設定されるからである。
+     * HCR_EL2.E2H == 1 の場合、CNTHCTL_EL2はCNTKCTL_EL1と同じビット
+     * レイアウトとなり、CNTKCTL_EL1へのアクセス命令がCNTHCTL_EL2への
+     * アクセスに再定義さることに注意されたい。これにより、EL1で動作する
+     * ように設計されたカーネルは、EL2でCNTKCTL_EL1にアクセスすることで
+     * EL0のビットを透過的に操作することができる。
      */
     cbnz    x2, 1f
     mrs    x0, cnthctl_el2
-    orr    x0, x0, #3            // Enable EL1 physical timers
+    orr    x0, x0, #3            // EL1物理タイマを有効化
     msr    cnthctl_el2, x0
 1:
-    msr    cntvoff_el2, xzr        // Clear virtual offset
+    msr    cntvoff_el2, xzr      //仮想オフセットをクリア
 
 ```
 
-Next piece of code is well explained in the comment above it. I have nothing to add.
+このコードはコメントで十分説明されています。私が付け加えることは何もありません。
 
 ```
 #ifdef CONFIG_ARM_GIC_V3
-    /* GICv3 system register access */
+    /* GICv3システムレジスタのアクセス */
     mrs    x0, id_aa64pfr0_el1
-    ubfx    x0, x0, #24, #4
-    cmp    x0, #1
-    b.ne    3f
+    ubfx    x0, x0, #24, #4         // GIC: [27:24]ビット
+    cmp    x0, #1                   // GIC v3があるか
+    b.ne    3f                      // なければ終わり
 
     mrs_s    x0, SYS_ICC_SRE_EL2
     orr    x0, x0, #ICC_SRE_EL2_SRE    // Set ICC_SRE_EL2.SRE==1
-    orr    x0, x0, #ICC_SRE_EL2_ENABLE    // Set ICC_SRE_EL2.Enable==1
+    orr    x0, x0, #ICC_SRE_EL2_ENABLE // Set ICC_SRE_EL2.Enable==1
     msr_s    SYS_ICC_SRE_EL2, x0
-    isb                    // Make sure SRE is now set
-    mrs_s    x0, SYS_ICC_SRE_EL2        // Read SRE back,
-    tbz    x0, #0, 3f            // and check that it sticks
-    msr_s    SYS_ICH_HCR_EL2, xzr        // Reset ICC_HCR_EL2 to defaults
+    isb                                // SREがセットされていることを保証
+    mrs_s    x0, SYS_ICC_SRE_EL2       // SREを再度読み込み
+    tbz    x0, #0, 3f                  // セットされているかチェック
+    msr_s    SYS_ICH_HCR_EL2, xzr      // ICC_HCR_EL2をデフォルトにリセット
 
 3:
 #endif
 ```
 
-Next code snippet is executed only if GICv3 is available and enabled. GIC stands for Generic Interrupt Controller. v3 version of the GIC specification adds a few features, that are particularly useful in virtualization context. For example, with GICv3 it becomes possible to have LPIs (Locality-specific Peripheral Interrupt). Such interrupts are routed via message bus and their configuration is held in special tables in memory.  
+このコードスニペットは、GICv3が利用可能で有効な場合にのみ実行されます。GICは
+Generic Interrupt Controller（汎用割り込みコントローラ）の略です。GIC仕様書の
+v3バージョンでは仮想化のコンテキストで特に有用な機能がいくつか追加されています。
+たとえば、GICv3では、LPI（Locality-specific Peripheral Interrupt: ローカル固有
+ペリフェラル割り込み）が可能になりました。このような割り込みは、メッセージ
+バスを介してルーティングされ、その設定はメモリ内の特別なテーブルに保持されます。
 
-The provided code is responsible for enabling SRE (System Register Interface) This step must be done before we will be able to use `ICC_*_ELn` registers and take advantages of GICv3 features. 
+上のコードはSRE（システムレジスタインタフェース）を有効にしています。
+`ICC_*_ELn`レジスタを使用してGICv3の機能を利用する前にこの手順を実行する
+必要があります。
 
 ```
-    /* Populate ID registers. */
+    /* ID registersを設定 */
     mrs    x0, midr_el1
     mrs    x1, mpidr_el1
     msr    vpidr_el2, x0
     msr    vmpidr_el2, x1
 ```
 
-`midr_el1` and `mpidr_el1` are read-only registers from the Identification registers group. They provide various information about processor manufacturer, processor architecture name, number of cores and some other info. It is possible to change this information for all readers that try to access it from EL1. Here we populate `vpidr_el2` and ` vmpidr_el2` with the values taken from `midr_el1` and `mpidr_el1`, so this information is the same whether you try to access it from EL1 or  higer exception levels.
+`midr_el1`と`mpidr_el1`は、Identificationレジスタグループに属する読み込み
+専用のレジスタです。これらのレジスタには、プロセッサの製造元、プロセッサの
+アーキテクチャ名、コア数などの情報が含まれています。EL1からアクセスしようと
+するすべての読者に対して、この情報を変更することができます。ここでは、`vpidr_el2`と`vmpidr_el2`に`midr_el1`と`mpidr_el1`から取得した値を入力して
+いますので、EL1からアクセスしても、それ以上の例外レベルからアクセスしても、
+この情報は同じになります。
 
 ```
 #ifdef CONFIG_COMPAT
-    msr    hstr_el2, xzr            // Disable CP15 traps to EL2
-#endif
+    msr    hstr_el2, xzr            // EL2でのCP15トラップを無効化
 ```
 
-When the processor is executing in 32-bit execution mode, there is a concept of "coprocessor". The coprocessor can be used to access information, that in 64-bit execution mode is typically accessed via system registers. You can read about what exactly is accessible via coprocessor [in the official documentation](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0311d/I1014521.html). `msr    hstr_el2, xzr` instruction allows using coprocessor from lower exception levels. This makes sense to do only when compatibility mode is enabled (in this mode kernel can run 32-bit user applications on top of 64-bit kernel.).
+プロセッサが32ビット実行モードで動作している場合、「コプロセッサ」という
+概念があります。コプロセッサは、64ビット実行モードでは通常システムレジスタを
+介してアクセスされるような情報にアクセスするために使用されます。コプロセッサを
+介してアクセス可能な正確な情報は[公式ドキュメント](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0311d/I1014521.html)で読むことができます。
+`msr hstr_el2, xzr`命令により、低い例外レベルからコプロセッサを使用することが
+できるようになります。これは互換モードが有効な場合にのみ意味があります（この
+モードでは、カーネルは64ビットカーネル上で32ビットのユーザーアプリケーションを
+実行することができます）。
 
 ```
-    /* EL2 debug */
-    mrs    x1, id_aa64dfr0_el1        // Check ID_AA64DFR0_EL1 PMUVer
-    sbfx    x0, x1, #8, #4
+    /* EL2 デバッグ */
+    mrs    x1, id_aa64dfr0_el1        // ID_AA64DFR0_EL1のPMUVerビットをチェック
+    sbfx   x0, x1, #8, #4
     cmp    x0, #1
-    b.lt    4f                // Skip if no PMU present
-    mrs    x0, pmcr_el0            // Disable debug access traps
-    ubfx    x0, x0, #11, #5            // to EL2 and allow access to
+    b.lt   4f                         // PMUがなければスキップ present
+    mrs    x0, pmcr_el0               // EL2でのデバッグアクセストラップを無効化
+    ubfx   x0, x0, #11, #5            // EL1からのすべてのPMUカウンタへの
 4:
-    csel    x3, xzr, x0, lt            // all PMU counters from EL1
+    csel   x3, xzr, x0, lt            // アクセスを許可
 
-    /* Statistical profiling */
-    ubfx    x0, x1, #32, #4            // Check ID_AA64DFR0_EL1 PMSVer
-    cbz    x0, 6f                // Skip if SPE not present
-    cbnz    x2, 5f                // VHE?
+    /* 統計的プロファイリング */
+    ubfx   x0, x1, #32, #4            // ID_AA64DFR0_EL1のPMSVerビットをチェック
+    cbz    x0, 6f                     // SPEがなければスキップ
+    cbnz   x2, 5f                     // VHE?
     mov    x1, #(MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT)
-    orr    x3, x3, x1            // If we don't have VHE, then
-    b    6f                // use EL1&0 translation.
-5:                        // For VHE, use EL2 translation
-    orr    x3, x3, #MDCR_EL2_TPMS        // and disable access from EL1
+    orr    x3, x3, x1                 // VHEがなければ
+    b      6f                         //   EL1&0変換を使う
+5:                                    // VHEがあれば、EL2変換を使い、
+    orr    x3, x3, #MDCR_EL2_TPMS     // EL1からのアクセスを無効に
 6:
-    msr    mdcr_el2, x3            // Configure debug traps
+    msr    mdcr_el2, x3               // デバッグトラップを構成
 ```
 
-This piece of code is responsible for configuring `mdcr_el2` (Monitor Debug Configuration Register (EL2)). This register is responsible for setting different debug traps, related to the virtualization extension.  I am going to leave the details of this code block unexplained because debug and tracing are a little bit out of scope for our discussion. If you are interested in details, I can recommend you to read the description of `mdcr_el2` register on page `2810` of the [AArch64-Reference-Manual](https://developer.arm.com/docs/ddi0487/ca/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile).
+このコードは`mdcr_el2`(モニタデバッグ構成レジスタ (EL2))の設定を行います。
+このレジスタは、仮想化拡張に関連するさまざまなデバッグトラップを設定する
+役割を果たします。このコードブロックの詳細は説明しません。なぜなら、デバッグと
+トレースは今回の議論の範囲外だからです。詳細を知りたい方は[AArch64リファレンスマニュアル](https://developer.arm.com/docs/ddi0487/ca/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile)の
+`2810`ページにある`mdcr_el2`レジスタの説明を読んでください。
 
 ```
-    /* Stage-2 translation */
+    /* ステージ-2 変換 */
     msr    vttbr_el2, xzr
 ```
 
-When your OS is used as a hypervisor it should provide complete memory isolation for its guest OSes. Stage 2 virtual memory translation is used precisely for this purpose: each guest OS thinks that it owns all system memory, though in reality each memory access is mapped to the physical memory by stage 2 translation. `vttbr_el2`  holds the base address of the translation table for the stage 2 translation.  At this point, stage 2 translation is disabled, and `vttbr_el2` should be set to 0.
+OSがハイパーバイザとして使用される場合、ゲストOSに対して完全なメモリ隔離を
+行う必要があります。ステージ 2の仮想メモリ変換はまさにこの目的に使用されます。
+各ゲストOSはすべてのシステムメモリを所有していると考えますが、実際には各メモリ
+アクセスはステージ 2の変換により物理メモリにマッピングされています。この時点
+では、ステージ2変換は無効にするので、`vttbr_el2`は`0`に設定します。
 
 ```
     cbz    x2, install_el2_stub
 
-    mov    w0, #BOOT_CPU_MODE_EL2        // This CPU booted in EL2
+    mov    w0, #BOOT_CPU_MODE_EL2        // このCPUはEL2でブート
     isb
     ret
 ```
 
-First `x2` is compared to `0` to check whether VHE is enabled. If yes - jump to `install_el2_stub` label, otherwise record that CPU is booted in EL2 mode and exit from `el2_setup` function.  In the latter case, the processor continues to operate in EL2 mode and EL1 will not be used at all.
+まず、`x2`を`0`と比較してVHEが有効になっているかチェックします。なっている
+場合は`install_el2_stub`ラベルにジャンプし、そうでない場合はCPUがEL2モードで
+起動したことを記録して`el2_setup`関数を終了します。後者の場合、プロセッサは
+EL2モードで動作し続け、EL1は全く使用されません。
 
 ```
 install_el2_stub:
     /* sctlr_el1 */
-    mov    x0, #0x0800            // Set/clear RES{1,0} bits
-CPU_BE(    movk    x0, #0x33d0, lsl #16    )    // Set EE and E0E on BE systems
-CPU_LE(    movk    x0, #0x30d0, lsl #16    )    // Clear EE and E0E on LE systems
+    mov    x0, #0x0800            // RES{1,0} ビットをセット/クリア
+CPU_BE(    movk    x0, #0x33d0, lsl #16    )    // BEシステムではEEとE0Eをセット
+CPU_LE(    movk    x0, #0x30d0, lsl #16    )    // LEシステムではEEとE0Eをクリア
     msr    sctlr_el1, x0
-
 ```
 
-If we reach this point it means that we don't need VHE and are going to switch to EL1 soon, so early EL1 initialization needs to be done here.  The copied code snippet is responsible for `sctlr_el1` (System Control Register) initialization. We already did the same job [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/boot.S#L18) for the RPi OS.
+ここに来たということはVHEは必要なく、すぐにEL1に切り替えるということなので、
+ここでEL1の早期初期化を行う必要があります。上のコードスニペットは`sctlr_el1`
+（システム制御レジスタ）の初期化を担当しています。RPi OSの[`boot.S#L18`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/boot.S#L18)で
+同じ作業を行っています。
 
 ```
-    /* Coprocessor traps. */
+    /* コプロセッサトラップ */
     mov    x0, #0x33ff
-    msr    cptr_el2, x0            // Disable copro. traps to EL2
+    msr    cptr_el2, x0            // EL2でのコプロセッサトラップを無効に
 ```
 
-This code allows EL1 to access `cpacr_el1` register and, as a result, to control access to Trace, Floating-point, and Advanced SIMD functionality.
+このコードは、EL1が`cpacr_el1`レジスタにアクセスできるようにし、その結果、
+トレース、浮動小数点、Advanced SIMDの各機能へのアクセスを制御できるように
+します。
 
 ```
-    /* Hypervisor stub */
+    /* ハイパーバイザスタブ */
     adr_l    x0, __hyp_stub_vectors
     msr    vbar_el2, x0
 ```
 
-We don't plan to use EL2 now, though some functionality requires it. We need it, for example, to implement [kexec](https://linux.die.net/man/8/kexec) system call that enables you to load and boot into another kernel from the currently running kernel. 
+今のところ、EL2を使用する予定はありませんが、いくつかの機能にはEL2が必要です。
+たとえば、現在実行中のカーネルから別のカーネルをロードして起動することを可能に
+する[kexec](https://linux.die.net/man/8/kexec)システムコールの実装に必要です。
 
-[_hyp_stub_vectors](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/hyp-stub.S#L33)  holds the addresses of all exception handlers for EL2. We are going to implement exception handling functionality for EL1 in the next lesson, after we talk about interrupts and exception handling in details.
+[_hyp_stub_vectors](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/hyp-stub.S#L33)にはEL2のすべての例外ハンドラのアドレスが格納されて
+います。次回のレッスンでは、割り込みと例外処理について詳しく説明し、EL1に
+おける例外処理機能を実装する予定です。
 
 ```
     /* spsr */
@@ -261,49 +336,69 @@ We don't plan to use EL2 now, though some functionality requires it. We need it,
               PSR_MODE_EL1h)
     msr    spsr_el2, x0
     msr    elr_el2, lr
-    mov    w0, #BOOT_CPU_MODE_EL2        // This CPU booted in EL2
+    mov    w0, #BOOT_CPU_MODE_EL2        // このCPUはEL2でブート
     eret
 ```
 
-Finally, we need to initialize processor state at EL1 and switch exception levels. We already did it for the [RPi OS](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/boot.S#L27-L33) so I am not going to explain the details of this code. 
+最後に、EL1でのプロセッサの状態を初期化し、例外レベルを切り替える必要が
+あります。これはすでに[RPi OS](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/src/boot.S#L27-L33)で行っていますので、このコードの
+詳細は説明しません。
 
-The only new thing here is the way how `elr_el2` is initialized. `lr` or Link Register is an alias for `x30`. Whenever you execute `bl` (Branch Link) instruction `x30` is automatically populated with the address of the current instruction. This fact is usually used by `ret` instruction, so it knows where exactly to return. In our case, `lr` points [here](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L119) and, because of the way how we initialized  `elr_el2`, this is also the place from which the execution is going to be resumed after switching to EL1.
+`elr_el2`の初期化方法だけは新しい点です。`lr`（リンクレジスタ）は`x30`の
+エイリアスです。`bl`(分岐リンク)命令を実行する度に`x30`には自動的に現在の
+命令のアドレスが入力されます。通常、この事実は`ret`命令によって使用される
+ので、`ret`命令はどこに戻るかを正確に知っています。今回の例では、`lr`は
+[`head.S#L119`](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L119)を
+指しており、`elr_el2`をこのように初期化したことで、EL1に切り替わった後には
+ここから実行が再開されることになります。
 
-### Processor initialization at EL1
+### EL1におけるプロセッサの初期化
 
-Now we are back to the `stext` function. Next few lines are not very important for us, but I want to explain them for the sake of completeness.
-
+`stext`関数に戻ってきました。ここから先の数行はあまり重要ではありませんが
+念のために説明しておきます。
 ```
-    adrp    x23, __PHYS_OFFSET
-    and    x23, x23, MIN_KIMG_ALIGN - 1    // KASLR offset, defaults to 0
+    adrp   x23, __PHYS_OFFSET
+    and    x23, x23, MIN_KIMG_ALIGN - 1    // KASLRオフセット、デフォルトは0
 ```
-[KASLR](https://lwn.net/Articles/569635/), or Kernel address space layout randomization, is a technique that allows to place the kernel at a random address in the memory. This is required only for security reasons. For more information, you can read the link above.
+
+[KASLR](https://lwn.net/Articles/569635/)（カーネルアドレス空間ランダム化）
+とは、カーネルをメモリのランダムなアドレスに配置する技術です。これは、
+セキュリティ上の理由からのみ必要となります。詳細については、上記のリンクを
+読んでください。
 
 ```
     bl    set_cpu_boot_mode_flag
 ```
 
-Here CPU boot mode is saved into [__boot_cpu_mode](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/virt.h#L74) variable. The code that does this is very similar to `preserve_boot_args` function that we explored previously.  
+ここでCPUのブートモードを[__boot_cpu_mode](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/virt.h#L74)
+変数に保存します。これを行うコードは、前に説明した`preserve_boot_args`関数と
+非常によく似ています。
 
 ```
     bl    __create_page_tables
-    bl    __cpu_setup            // initialise processor
-    b    __primary_switch
+    bl    __cpu_setup            // プロセッサを初期化
+    b     __primary_switch
 ```
 
-The last 3 functions are very important, but they all are related to virtual memory management, so we are going to postpone their detailed exploration until the lesson 6. For now, I just want to brefely describe there meanings.
-* `__create_page_tables` As its name stands this one is responsible for creating Page Tables.
-* `__cpu_setup` Initialize various processor settings, mostly specific for virtual memory management.
-* `__primary_switch` Enable MMU and jump to [start_kernel](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L509) function, which is architecture independent starting point.
+この最後の3つの関数は非常に重要ですが、いずれも仮想メモリ管理に関連している
+ため、詳細な検討はレッスン6まで延期します。今のところは、その意味を簡単に
+説明したいと思います
 
-### Conclusion
+* `create_page_tables` その名の通り、ページテーブルの作成を担当します。
+* `__cpu_setup` 様々なプロセッサの設定、ほとんどは仮想メモリ管理に固有の設定を初期化します。
+* `__primary_switch` MMUを有効にして、アーキテクチャに依存しない開始点である[start_kernel](https://github.com/torvalds/linux/blob/v4.14/init/main.c#L509)
+関数にジャンプします。
 
-In this chapter, we briefly discussed how a processor is initialized when the Linux kernel is booted. In the next lesson, we will continue to closely work with the ARM processor and investigate a vital topic for any OS: interrupt handling.
- 
-##### Previous Page
+### 結論
 
-2.1 [Processor initialization: RPi OS](../../docs/lesson02/rpi-os.md)
+本章では、Linuxカーネルの起動時にプロセッサがどのように初期化されるかについて
+簡単に説明しました。次のレッスンでは、引き続きARMプロセッサに密着し、すべての
+OSにとって重要なトピックである割り込み処理について調べていきます。
 
-##### Next Page
+##### 前ページ
 
-2.3 [Processor initialization: Exercises](../../docs/lesson02/exercises.md)
+2.1 [プロセッサの初期化: RPi OS](../../docs/lesson02/rpi-os.md)
+
+##### 次ページ
+
+2.3 [プロセッサの初期化: 演習](../../docs/lesson02/exercises.md)
