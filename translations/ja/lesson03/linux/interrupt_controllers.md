@@ -1,46 +1,83 @@
-## 3.3: Interrupt controllers
+## 3.3: 割り込みコントローラ
 
-In this chapter, we are going to talk a lot about Linux drivers and how they handle interrupts. We will start with driver initialization code and then take a look at how interrupts are processed after [handle_arch_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L44) function.
+この章では、Linuxのドライバとそれがどのように割り込みを処理するかについて詳しく
+説明します。まず、ドライバの初期化コードから始めて、[handle_arch_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L44)
+関数後に割り込みがどのように処理されるかを見ていきます。
 
-### Using device tree to find out needed devices and drivers
+### デバイスツリーを使って必要なデバイスとドライバを探す
 
-When implementing interrupts in the RPi OS we have been working with 2 devices: system timer and interrupt controller. Now our goal will be to understand how the same devices work in Linux. The first thing we need to do is to find drivers that are responsible for working with mentioned devices. And in order to find needed drivers we can use [bcm2837-rpi-3-b.dts](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts) device tree file. This is the top level device tree file that is specific for Raspberry Pi 3 Model B, it includes other more common device tree files, that are shared between different versions of Raspberry Pi. If you follow the chain of includes and search for `timer` and `interrupt-controller` you can find 4 devices.
+RPi OSにおける割り込みを実装する際に、システムタイマと割り込みコントローラという
+2つのデバイスを扱いました。ここでは、同じデバイスがLinuxでどのように動作するかを
+理解することを目的とします。まず最初にしなければならないことはこのデバイスを扱う
+ドライバを見つけることです。必要なドライバを見つけるには[bcm2837-rpi-3-b.dts](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837-rpi-3-b.dts)
+デバイスツリーファイルが使用できます。これはRaspberry Pi 3 Model B専用のトップ
+レベルのデバイスツリーファイルですが、Raspberry Piの様々なバージョンで
+共有される、より一般的なデバイスツリーファイルをインクルードしています。
+インクルードの連鎖をたどり、`timer`と`interrupt-controller`を検索すると
+次の4つのデバイスが見つかります。
 
-1. [Local interrupt controller](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L11)
-1. [Local timer](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L20)
-1. Global interrupt controller. It is defined [here](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L109) and modified [here](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L72).
-1. [System timer](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L57)
+1. [ローカル割り込みコントローラ](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L11)
+2. [ローカルタイマ](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L20)
+3. グローバル割り込みコントローラ。これは、[`bcm283x.dtsi#L109`](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L109)
+で定義され、[`bcm2837.dtsi#L72`](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L72)で
+変更されています。
+4. [システムタイマ](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm283x.dtsi#L57)
 
-Stop, but why do we have 4 devices instead of 2? This requires some explanation, and we will tackle this question in the next section.
+待ってください。なぜ2つではなく、4つのデバイスがあるのでしょうか。これには説明が
+必要ですので、次の節でこの疑問に取り組みます。
 
-### Local vs global interrupt controllers
+### ローカル割り込みコントローラ vs グローバル割り込みコントローラ
 
-When you think about interrupt handling in multiprocessor systems, one question you should ask yourself is which core should be responsible for processing a particular interrupt? When an interrupt occurs, are all 4 cores interrupted, or only a single one? Is it possible to route a particular interrupt to a specific core? Another question you may wonder is how one processor can notify another processor if he needs to pass some information to it?
+マルチプロセッサシステムの割り込み処理を考えると、疑問に思うことがあります。
+ある割り込みの処理をどのコアが担当するのかという疑問です。また、割り込みが
+発生したとき、4つのコアのすべてが割り込まれるのか、それとも1つのコアだけが
+割り込まれるのか。さらに、特定の割り込みを特定のコアに割り当てることは可能か。
+あるプロセッサが別のプロセッサに情報を渡す必要がある場合、どのように他の
+プロセッサに通知するのかという疑問もあるでしょう。
 
-The local interrupt controller is a device that can help you in answering all those questions. It is responsible for the following tasks.
+ローカルインタラプトコントローラはこれらの疑問のすべてを解決してくれる
+デバイスです。ローカルインタラプトコントローラは次の役割を担っています。
 
-* Configuring which core should receive a specific interrupt.
-* Sending interrupts between cores. Such interrupts are called "mailboxes" and allow cores to communicate one with each other.
-* Handling interrupts from local timer and performance monitors interrupts (PMU).
+* 特定の割り込みをどのコアが受け取るべきかを設定する。
+* コア間で割込みを送信する。このような割り込みは「メールボックス」と呼ばれ、
+コア同士の通信を可能にします。
+* ローカルタイマ割り込みやパフォーマンスモニター割り込み（PMU）を処理する。
 
-The behavior of a local interrupt controller as well as a local timer is documented in [BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf) manual.
+ローカル割り込みコントローラとローカルタイマの動作については、[BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf)
+マニュアルに記載されています。
 
-I already mentioned local timer several times. Now you probably wonder why do we need two independent timers in the system? I guess that the primary use-case for using the local timer is when you want to configure all 4 cores to receive timer interrupts simultaneously. If you use system timer you can only route interrupts to a single core.
+ローカルタイマについては既に何度か触れています。では、なぜシステムには2つの
+独立したタイマが必要なのか疑問に思うでしょう。ローカルタイマの主なユースケースは、
+4つのコアが同時にタイマ割り込みを受け取るように設定したい場合だと思います。
+システムタイマを使用すると割り込みは1つのコアにしかルーティングできないからです。
 
-When working with the RPi OS we didn't work with either local interrupt controller or local timer. That is because by default local interrupt controller is configured in such a way that all external interrupts are sent to the first core, which is exactly what we need. We haven't used local timer because we use system timer instead.
+RPi OSではローカル割り込みコントローラもローカルタイマも使用しませんでした。
+デフォルトですべての外部割り込みが最初のコアに送られるようにローカル割り込み
+コントローラが設定されており、この設定はまさに私たちが必要としているものだから
+です。また、ローカルタイマを使用しなかったのは、代わりにシステムタイマを使用した
+からです。
 
-### Local interrupt controller
+### ローカル割り込みコントローラ
 
-Accordingly to the [bcm2837.dtsi](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L75) the global interrupt controller is a child of the local one. Thus it makes sense to start our exploration with the local controller.
+[bcm2837.dtsi](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L75)に
+よると、グローバル割り込みコントローラはローカル割り込みコントローラの子です。
+したがって、ローカルコントローラから調査を始めることは理にかなっています。
 
-If we need to find a driver that works with a particular device, we should use [compatible](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L12) property. Searching for the value of this property you can easily find that there is a single driver that is compatible with RPi local interrupt controller - here is the corresponding [definition](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L315).
+特定のデバイスで動作するドライバを見つける必要がある場合は[compatible](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L12)
+プロパティを使用します。このプロパティの値を検索すると、RPiのローカル割り込み
+コントローラと互換性のあるドライバが1つだけあることが簡単にわかります。 以下に
+対応する[定義](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L315)を示します。
 
 ```
 IRQCHIP_DECLARE(bcm2836_arm_irqchip_l1_intc, "brcm,bcm2836-l1-intc",
         bcm2836_arm_irqchip_l1_intc_of_init);
 ```
 
-Now you can probably guess what is the procedure of a driver initialization: the kernel walks through all device definitions in the device tree and for each definition it looks for a matching driver using "compatible" property. If the driver is found, then its initialization function is called. Initialization function is provided during device registration, and in our case this function is [bcm2836_arm_irqchip_l1_intc_of_init](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L280).
+ドライバの初期化手順がどのようなものであるかはおそらく推測できるでしょう。
+カーネルはデバイスツリーにあるすべてのデバイス定義を走査し、各定義に対して
+"compatible"プロパティを使って一致するドライバを探します。ドライバが見つかったら、
+その初期化関数を呼び出します。初期化関数はデバイスの登録時に提供されており、
+ここでは[bcm2836_arm_irqchip_l1_intc_of_init](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L280)です。
 
 ```
 static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
@@ -79,13 +116,27 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 }
 ```
 
-The initialization function takes 2 parameters: 'node' and 'parent', both of them are of the type [struct device_node](https://github.com/torvalds/linux/blob/v4.14/include/linux/of.h#L49). `node` represents the current node in the device tree, and in our case it points [here](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L11)  `parent` is a parent node in the device tree hierarchy, and for the local interrupt controller it points to `soc` element (`soc` stands for "system on chip" and it is the simplest possible bus which maps all device registers directly to main memory.).
+初期化関数は2つのパラメータ`node`と`parent`を受け取ります。どちらの型も[struct device_node](https://github.com/torvalds/linux/blob/v4.14/include/linux/of.h#L49)
+です。`node`はデバイスツリーのカレントノードを表し、ここでは[ローカル割り込みコントローラ](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L11)
+を指しています。`parent`はデバイスツリー階層における親ノードであり、ローカル
+割り込みコントローラの場合は`soc`要素を指しています（`soc`は"system on chip"の略で、
+すべてのデバイスレジスタをメインメモリに直接マッピングする最もシンプルなバスです）。
 
-`node` can be used to read various properties from the current device tree node. For example, the first line of the `bcm2836_arm_irqchip_l1_intc_of_init` function reads the device base address from [reg](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L13) property. However, the process is more complicated than that, because when this function is executed MMU is already enabled, and before we will be able to access some region of physical memory we must map this region to some virtual address. This is exactly what [of_iomap](https://github.com/torvalds/linux/blob/v4.14/drivers/of/address.c#L759) function is doing: it reads `reg` property of the provided node and maps the whole memory region, described by `reg` property, to some virtual memory region.
+`node`を使ってカレントデバイスツリーノードから様々なプロパティを読み取ることが
+できます。たとえば、`bcm2836_arm_irqchip_l1_intc_of_init`関数の1行目では[reg](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L13)
+プロパティからデバイスのベースアドレスを読み込んでいます。しかし、その過程はより
+複雑です。この関数が実行される際、MMUはすでに有効になっているので、物理メモリの
+領域にアクセスする前にその領域を何らかの仮想アドレスにマッピングする必要がある
+からです。[of_iomap](https://github.com/torvalds/linux/blob/v4.14/drivers/of/address.c#L759)
+関数が行っているのはまさにこれです。この関数は提供されたノードの`reg`プロパティを
+読み込み、`reg`プロパティに記述されているメモリ領域全体をある仮想メモリ領域に
+マッピングします。
 
-Next local timer frequency is initialized in [bcm2835_init_local_timer_frequency](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L264) function. There is nothing specific about this function: it just uses some of the registers, described in [BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf) manual, to initialize local timer.
+次に、ローカルタイマの周波数を[bcm2835_init_local_timer_frequency](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L264)
+関数で初期化します。この関数については特に言うことはありません。[BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf)
+マニュアルに記載されているレジスタを使用してローカルタイマを初期化しているだけです。
 
-Next line requires some explanations.
+次の行は少し説明が必要です。
 
 ```
     intc.domain = irq_domain_add_linear(node, LAST_IRQ + 1,
@@ -93,9 +144,22 @@ Next line requires some explanations.
                         NULL);
 ```
 
-Linux assigns a unique integer number to each interrupt, you can think about this number as a unique interrupt ID. This ID is used each time you want to do something with an interrupt (for example, assign a handler, or assign which CPU should handle it). Each interrupt also has a hardware interrupt number. This is usually a number that tells which interrupt line was triggered. `BCM2837 ARM Peripherals manual` has the peripheral interrupt table at page 113 - you can think about an index in this table as a hardware interrupt number. So obviously we need some mechanism to map Linux irq numbers to hardware irq number and vice versa. If there is only one interrupt controller it would be possible to use one to one mapping but in general case a more sophisticated mechanism need to be used. In Linux [struct irq_domain](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdomain.h#L152) implements such mapping. Each interrupt controller driver should create its own irq domain and register all interrupts that it can handle with this domain. Registration function returns Linux irq number that later is used to work with the interrupt.
+Linuxでは各割込みにユニークな整数番号を割り当てます。この番号はユニークな割込みIDと
+考えることができます。このIDは（たとえば、ハンドラの割り当て、割り込みを処理する
+CPUの割り当てなど）割り込みに対して何かを行う場合常に使用されます。割込みには
+ハードウェア割込み番号も割り当てられます。これは通常、どの割り込みラインがトリガ
+されたかを示す番号です。`BCM2837 ARM Peripherals`マニュアルの113ページには
+ペリフェラル割り込みテーブルがありますが、このテーブルのインデックスがハードウェア
+割り込み番号であると考えることができます。したがって、Linuxの割り込み番号を
+ハードウェア割り込み番号にマッピングしたり、その逆を行うメカニズムが必要です。
+割り込みコントローラが1つしかない場合は、1対1のマッピングが可能ですが、
+一般的なケースでは、より洗練されたメカニズムを使用する必要があります。
+Linuxでは[struct irq_domain](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdomain.h#L152) が
+このマッピングを実装しています。各割込みコントローラドライバは独自のirqドメインを
+作成し、処理可能なすべての割込みをこのドメインに登録する必要があります。
+登録関数は、その後その割り込みの処理に使われるLinux割り込み番号を返します。
 
-Next 6 lines are responsible for registering each supported interrupt with the irq domain.
+次の6行はサポートしている割込みをirqドメインに登録するためのものです。
 
 ```
     bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_CNTPSIRQ,
@@ -112,7 +176,16 @@ Next 6 lines are responsible for registering each supported interrupt with the i
                      &bcm2836_arm_irqchip_pmu);
 ```
 
-Accordingly to [BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf) manual local interrupt controller handles 10 different interrupts: 0 - 3 are interrupts from local timer, 4 - 7 are mailbox interrupts, which are used in interprocess communication, 8 corresponds to all interrupts generated by the global interrupt controller and interrupt 9 is a performance monitor interrupt. [Here](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L67) you can see that the driver defines a set of constants that holds hardware irq number per each interrupt. The registration code above registers all interrupts, except mailbox interrupts, which are registered separately. In order to understand the registration code better lets examine [bcm2836_arm_irqchip_register_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L154) function.
+[BCM2836 ARM-local peripherals](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf)
+マニュアルによると、ローカル割り込みコントローラは10種類の割り込みを処理します。
+0～3はローカルタイマからの割り込み、4～7はプロセス間通信に使用されるメールボックス
+割り込み、8はグローバル割り込みコントローラが生成するすべての割り込み、9は
+パフォーマンスモニタ割り込みです。ここでは、ドライバが定義している各割込みの
+ハードウェアIRQ番号を保持している一連の定数は[irq-bcm2836.c#L67](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L67)
+にあります。上記の登録コードでは、別のところで登録されているメールボックス
+割り込みを除くすべての割り込みを登録しています。この登録コードをより深く理解する
+ために[bcm2836_arm_irqchip_register_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L154)
+関数を調べましょう。
 
 ```
 static void bcm2836_arm_irqchip_register_irq(int hwirq, struct irq_chip *chip)
@@ -125,23 +198,46 @@ static void bcm2836_arm_irqchip_register_irq(int hwirq, struct irq_chip *chip)
 }
 ```
 
-The first line here performs actual interrupt registration. [irq_create_mapping](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/irqdomain.c#L632) takes hardware interrupt number as an input and returns Linux irq number.
+最初の行は実際の割り込み登録を行っています。[irq_create_mapping](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/irqdomain.c#L632)は
+ハードウェア割り込み番号を引数に取り、Linux割り込み嵌合を返します。
 
-[irq_set_percpu_devid](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/irqdesc.c#L849) configures interrupt as "per CPU", so that it will be handled only on the current CPU. This makes perfect sense because all interrupts that we are discussing now are local and they all can be handled only on the current CPU.
+[irq_set_percpu_devid](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/irqdesc.c#L849)は
+割り込みを「CPUごと」に設定します。そのため、カレントCPUでのみ処理されます。
+現在検討しているすべての割り込みはローカルであり、それらはすべてカレントCPUで
+しか処理できないので、これは完全に理にかなっています。
 
-[irq_set_chip_and_handler](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L608), as its name suggest, sets irq chip and irq handler. Irq chip is a special struct, which needs to be created by the driver, that has methods for masking and unmasking a particular interrupt. The driver that we are examining right now defines 3 different irq chips: [timer](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L118) chip, [PMU](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L134) chip and [GPU](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L148) chip, which controls all interrupts generated by the external peripheral devices. Handler is a function that is responsible for processing an interrupt. In this case, the handler is set to generic [handle_percpu_devid_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L859) function. This handler later will be rewritten by the global interrupt controller driver.
+[irq_set_chip_and_handler](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L608)は
+その名前が示すように、irqチップとirqハンドラを設定します。Irqチップはドライバが作成
+する必要のある特殊な構造体であり、特定の割り込みをマスクしたりアンマスクしたりする
+メソッドを持っています。現在調べているドライバは、
+[タイマ](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L118)チップと
+[PMU](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L134)チップ、
+[GPU](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L148)チップの3つのirqチップを定義しており、外部ペリフェラルから発生するすべての割り込みを
+制御します。ハンドラは割り込みの処理を担当する関数です。この例では汎用の
+[handle_percpu_devid_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L859)関数を
+ハンドラとして設定しています。このハンドラは後でグローバル割り込みコントローラ
+ドライバによって書き換えられます。
 
-[irq_set_status_flags](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L652) in this particular case sets a flag, indicating that the current interrupt should be enabled manually and should not be enabled by default.
+ここでの[irq_set_status_flags](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L652)は
+カレント割り込みは手動で有効にすべきであり、デフォルトでは有効にすべきでないことを
+示すフラグを設定しています。
 
-Going back to the `bcm2836_arm_irqchip_l1_intc_of_init` function, there are only 2 calls left. The first one is [bcm2836_arm_irqchip_smp_init](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L243). Here mailbox interrupts are enabled, allowing processors cores to communicate with each other.
+`bcm2836_arm_irqchip_l1_intc_of_init`関数に戻ると、後は2つの関数呼び出ししか
+残っていません。最初の一つは[bcm2836_arm_irqchip_smp_init](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L243)です。
+ここではメールボックス割り込みが有効になり、プロセッサのコア同士の通信が
+可能になります。
 
-The last function call is extremely important - this is the place where low-level exception handling code is connected to the driver.
+最後の関数呼び出しは極めて重要です。これは低レベル例外処理コードがドライバに
+接続される場所だからです。
 
 ```
     set_handle_irq(bcm2836_arm_irqchip_handle_irq);
 ```
 
-[set_handle_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L46) is defined in architecture specific code and we already encountered this function. From the line above we can understand that [bcm2836_arm_irqchip_handle_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L164) will be called by the low-level exception code. The function itself is listed below.
+[set_handle_irq](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/irq.c#L46)は
+アーキテクチャ固有のコードで定義されており、この関数にはすでに見ています。
+このコードから[bcm2836_arm_irqchip_handle_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2836.c#L164)が低レベル例外コードから呼び出される
+ことがわかります。この関数自体を以下に示します。
 
 ```
 static void
@@ -169,7 +265,13 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 }
 ```
 
-This function reads `LOCAL_IRQ_PENDING` register to figure out what interrupts are currently pending. There are 4 `LOCAL_IRQ_PENDING` registers, each corresponding to its own processor core, that's why current processor index is used to select the right one. Mailbox interrupts and all other interrupts are processed in 2 different clauses of an if statement. The interaction between different cores of a multiprocessor system is out of scope for our current discussion, so we are going to skip mailbox interrupt handling part. Now we have only the following 2 lines left unexplained.
+この関数は`LOCAL_IRQ_PENDING`を読んで現在保留されている割り込みを把握します。
+`LOCAL_IRQ_PENDING`レジスタは4つあり、各々が各自のプロセッサコアに対応している
+ので、現在のプロセッサインデックスを使って正しいレジスタを選択しています。
+メールボックス割り込みとその他の割り込みが2つのif文で処理されています。
+マルチプロセッサシステムにおけるコア間の相互作用については、今回の議論の
+対象外ですのでメールボックス割り込み処理の部分は省略します。次の2行だけが
+説明されずに残りました。
 
 ```
         u32 hwirq = ffs(stat) - 1;
@@ -177,11 +279,22 @@ This function reads `LOCAL_IRQ_PENDING` register to figure out what interrupts a
         handle_domain_irq(intc.domain, hwirq, regs);
 ```
 
-This is were interrupt is passed to the next handler. First of all hardware irq number is calculated. [ffs](https://github.com/torvalds/linux/blob/v4.14/include/asm-generic/bitops/ffs.h#L13) (Find first bit) function is used to do this. After hardware irq number is calculated [handle_domain_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/irqdesc.c#L622) function is called. This function uses irq domain to translate hardware irq number to Linux irq number, then checks irq configuration (it is stored in [irq_desc](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdesc.h#L55) struct) and calls an interrupt handler. We've seen that the handler was set to [handle_percpu_devid_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L859). However, this handler will be overwritten by the child interrupt controller later. Now, let's examine how this happens.
+ここで割り込みを次のハンドラに渡しています。まず、ハードウェアIRQ番号を計算
+します。計算には[ffs](https://github.com/torvalds/linux/blob/v4.14/include/asm-generic/bitops/ffs.h#L13)
+(Find first bit)関数を使います。ハードウェアirq番号が計算しらた[handle_domain_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/irqdesc.c#L622)
+関数を呼び出します。この関数はirq domainを使ってハードウェアirq番号をLinux irq
+番号に変換し、([irq_desc](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdesc.h#L55)構造体に格納されている)irqの
+構成をチェックしてから割り込みハンドラを呼び出します。ハンドラが[handle_percpu_devid_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L859)に
+設定されていることは既に見てきました。ただし、このハンドラは後で子の割り込み
+コントローラによって上書きされます。では、その仕組みを見てみましょう。
 
-### Generic interrupt controller
+### 汎用割り込みコントローラGeneric interrupt controller
 
-We have already seen how to use device tree and `compatible` property to find the driver corresponding to some device, so I am going to skip this part and jump straight to the generic interrupt controller driver source code. You can find it in [irq-bcm2835.c](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c) file. As usual, we are going to start our exploration with the initialization function. It is called [armctrl_of_init](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L141).
+デバイスツリーと`compatible`プロパティを使い、何らかのデバイスに対応する
+ドライバを見つける方法はすでに見てきましたので、この部分は省略して、汎用
+割り込みコントローラドライバのソースコードに直接飛びます。ソースコードは
+[irq-bcm2835.c](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c)
+ファイルにあります。いつものように、初期化関数から探究を始めます。それは a[armctrl_of_init](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L141)と呼ばれています。
 
 ```
 static int __init armctrl_of_init(struct device_node *node,
@@ -230,7 +343,7 @@ static int __init armctrl_of_init(struct device_node *node,
 }
 ```
 
-Now, let's investigate this function in more details.
+では、この関数を詳細に見ていきましょう。
 
 ```
     void __iomem *base;
@@ -247,7 +360,9 @@ Now, let's investigate this function in more details.
 
 ```
 
-The function starts with the code that reads device base address from the device tree and initializes the irq domain. This part should be already familiar to you because we have seen similar code in the local irq controller driver.
+この関数は、デバイスツリーからデバイスのベースアドレスを読み取り、irqドメインを
+初期化するコードから始まります。この部分はローカルIRQコントローラドライバで
+同じようなコードを見たことがあるのでもうお馴染みでしょう。
 
 ```
     for (b = 0; b < NR_BANKS; b++) {
@@ -256,7 +371,13 @@ The function starts with the code that reads device base address from the device
         intc.disable[b] = base + reg_disable[b];
 ```
 
-Next, there is a loop that iterates over all irq banks. We already briefly touched irq banks in the first chapter of this lesson. The interrupt controller has 3 irq banks, which are controlled by `ENABLE_IRQS_1`, `ENABLE_IRQS_2` and `ENABLE_BASIC_IRQS` registers.  Each of the banks has its own enable, disable and pending registers. Enable and disable registers can be used to either enable or disable individual interrupts that belong to a particular bank. Pending register is used to determine what interrupts are waiting to be processed.
+次に、すべてのirqバンクを繰り返し処理するループがあります。irqバンクについてはすでに
+このレッスンの最初の章で簡単に触れています。割り込みコントローラには3つのirqバンクが
+あり、各々、`ENABLE_IRQS_1`、`ENABLE_IRQS_2`、`ENABLE_BASIC_IRQS`レジスタで制御
+されています。バンクには各自3つのレジスタ: イネーブル，ディセーブル，ペンディングが
+あります。イネーブルとディスエーブルレジスタは、そのバンクに属する個々の割り込みを
+有効または無効にするために使用できます。ペンディングレジスタは、どの割り込みが
+処理待ちであるかを判別するために使用します。
 
 ```
         for (i = 0; i < bank_irqs[b]; i++) {
@@ -268,15 +389,30 @@ Next, there is a loop that iterates over all irq banks. We already briefly touch
         }
 ```
 
-Next, there is a nested loop that is responsible for registering each supported interrupt and setting irq chip and handler.
+ついで、サポートしている割り込みの登録、irqチップとハンドラの設定を行う入れ子の
+ループがあります。
 
-We already saw how the same functions are used in the local interrupt controller driver. However, I would like to highlight a few important things.
+同じ関数がローカル割り込みコントローラドライバでどのように使われているかは
+すでに見ました。しかし、いくつかの重要な点を強調しておきたいと思います。
 
-* [MAKE_HWIRQ](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L57) macro is used to calculate hardware irq number. It is calculated based on bank index and irq index inside the bank.
-* [handle_level_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L603) is a common handler that is used for interrupts of the level type. Interrupts of such type keep interrupt line set to "high" until the interrupt is acknowledged. There are also edge type interrupts that works in a different way.
-* [irq_set_probe](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L667) function just unsets [IRQ_NOPROBE](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L64) interrupt flag, effectively disabling interrupt auto-probing. Interrupt auto-probing is a process that allows different drivers to discover which interrupt line their devices are connected to. This is not needed for Raspberry Pi, because this information is encoded in the device tree, however, for some devices, this might be useful. Please, refer to [this](https://github.com/torvalds/linux/blob/v4.14/include/linux/interrupt.h#L662) comment to understand how auto-probing works in the Linux kernel.
+* [MAKE_HWIRQ](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L57)マクロは、ハードウェアIRQ番号の算出に使用します。バンク
+インデックスとバンク内のIRQインデックスに基づいて計算されます。
+* [handle_level_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L603)は、
+レベルタイプの割り込みに使用される共通ハンドラです。このタイプの割り込みは
+割り込みが確認されるまで、割り込みラインを"ハイ"に保ちます。また、動作の異なる
+エッジタイプの割り込みもあります。
+* [irq_set_probe](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L667)関数は、
+[IRQ_NOPROBE](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L64)
+割り込みフラグを解除するだけで、割り込みのオートプロービングを効果的に無効にします。
+割り込みオートプロービングとは、ドライバが各自のデバイスがどの割り込みラインに
+接続されているかを発見できるようにするためのプロセスです。Raspberry Piでは
+この情報がデバイスツリーに書かれているので必要ありませんが、これが役に立つ
+デバイスもあるかもしれませんん。Linuxカーネルにおけるオートプロービングの仕組みに
+ついては[このコメント](https://github.com/torvalds/linux/blob/v4.14/include/linux/interrupt.h#L662)を参照してください。
 
-Next piece of code is different for BCM2836 and BCM2835 interrupt controllers (the first one corresponds to the RPi models 2 and 3, and the second one to RPi Model 1).  If we are dealing with BCM2836 the following code is executed.
+次のコードは、BCM2836とBCM2835の割り込みコントローラで異なります（前者はRPiモデル2と
+3に、後者はRPiモデル1に対応します）。BCM2836を扱っている場合は、以下のコードが
+実行されます。
 
 ```
         int parent_irq = irq_of_parse_and_map(node, 0);
@@ -288,9 +424,17 @@ Next piece of code is different for BCM2836 and BCM2835 interrupt controllers (t
         irq_set_chained_handler(parent_irq, bcm2836_chained_handle_irq);
 ```
 
-Device tree [indicates](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L75) that local interrupt controller is a parent of the global interrupt controller. Another device tree [property](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L76) tells us that global interrupt controller is connected to the interupt line number 8 of the local controller, this means that our parent irq is the one with hardware irq number 8. Those 2 properties allow Linux kernel to find out parent interrupt number (this is Linux interrupt number, not hardware number). Finally [irq_set_chained_handler](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L636) function replaces the handler of the parent irq with [bcm2836_chained_handle_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L246) function.
+デバイスツリーはローカル割込みコントローラがグローバル割込みコントローラの親で
+あると[示しています](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L75)。
+別のデバイスツリーの[プロパティ](https://github.com/torvalds/linux/blob/v4.14/arch/arm/boot/dts/bcm2837.dtsi#L76)は
+グローバル割り込みコントローラはローカルコントローラの割り込み線番号8に接続されて
+いることを示しています。これは、親のirqはハードウェアirq番号が8のirqであることを
+意味します。この2つのプロパティによりLinuxカーネルは親の割り込み番号を知ることが
+できます（これはLinux割り込み番号であり、ハードウェア番号ではありません）。最後に。[irq_set_chained_handler](https://github.com/torvalds/linux/blob/v4.14/include/linux/irq.h#L636)
+関数が親irqのハンドラを[bcm2836_chained_handle_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L246)
+関数に置き換えます。
 
-[bcm2836_chained_handle_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L246) is very simple. Its code is listed below.
+[bcm2836_chained_handle_irq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L246)は非常にシンプルです。そのコードを以下に示します。
 
 ```
 static void bcm2836_chained_handle_irq(struct irq_desc *desc)
@@ -302,12 +446,22 @@ static void bcm2836_chained_handle_irq(struct irq_desc *desc)
 }
 ```
 
-You can think about this code as an advanced version of what we did [here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L39) for the RPi OS. [get_next_armctrl_hwirq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L217) uses all 3 pending registers to figure out which interrupt was fired. [irq_linear_revmap](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdomain.h#L377) uses irq domain to translate hardware irq number into Linux irq number and [generic_handle_irq](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdesc.h#L156) just executes irq handler. Irq handler was set in the initialization function and it points to [handle_level_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L603) that eventually executes all irq actions associated with the interrupt (this is actually done [here](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/handle.c#L135).). For now, the list of irq actions is empty for all supported interrupts - a driver that is interested in handling some interrupt should add an action to the appropriate list. In the next chapter, we are going to see how this is done using system timer as an example.
+このコードはRPi OSのために[irq.c#L39](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson03/src/irq.c#L39)で
+行ったものの上位版と考えることができます。[get_next_armctrl_hwirq](https://github.com/torvalds/linux/blob/v4.14/drivers/irqchip/irq-bcm2835.c#L217)は
+3つの保留レジスタのすべてを使ってどの割り込みが発生したかを調べます。[irq_linear_revmap](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdomain.h#L377)は
+irqドメインを使ってハードウェアirq番号をLinux irq番号に変換し、[generic_handle_irq](https://github.com/torvalds/linux/blob/v4.14/include/linux/irqdesc.h#L156)は
+irqハンドラを実行します。irqハンドラは初期化関数で設定されており、最終的に
+その割り込みに関連するすべてのirqアクションを実行する[handle_level_irq](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/chip.c#L603)を
+指しています(これは実際に[`handle.c#L135`](https://github.com/torvalds/linux/blob/v4.14/kernel/irq/handle.c#L135)で
+行われています)。今のところ、サポートされているすべての割り込みに対して、
+irqアクションのリストは空になっています。何らかの割り込みを処理したいと考える
+ドライバは適切なリストにアクションを追加する必要があります。次の章では、
+システムタイマを例として、これがどのように行われるかを見ていきます。
 
-##### Previous Page
+##### 前ページ
 
-3.2 [Interrupt handling: Low-level exception handling in Linux](../../../ja/lesson03/linux/low_level-exception_handling.md)
+3.2 [割り込み処理: Linuxにおける低レベル例外処理](../../../ja/lesson03/linux/low_level-exception_handling.md)
 
-##### Next Page
+##### 次ページ
 
-3.4 [Interrupt handling: Timers](../../../ja/lesson03/linux/timer.md)
+3.4 [割り込み処理: タイマ](../../../ja/lesson03/linux/timer.md)
