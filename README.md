@@ -57,7 +57,7 @@ OS開発のスキルは必要ありません。
   * Linux
     * 3.2 [低レベル例外処理](translations/ja/lesson03/linux/low_level-exception_handling.md)
     * 3.3 [割り込みコントローラ](translations/ja/lesson03/linux/interrupt_controllers.md)
-    * 3.4 [Timers](translations/ja/lesson03/linux/timer.md)
+    * 3.4 [タイマ](translations/ja/lesson03/linux/timer.md)
   * 3.5 [演習](translations/ja/lesson03/exercises.md)
 * **Lesson 4: プロセススケジューラ**
   * 4.1 [RPi OS](translations/ja/lesson04/rpi-os.md)
