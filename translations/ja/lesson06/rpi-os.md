@@ -1,10 +1,21 @@
-## 6.1: Virtual memory management
+## 6.1: 仮想メモリ管理
 
-The RPi OS now can run and schedule user processes, but the isolation between them is not complete - all processes and the kernel itself share the same memory. This allows any process to easily access somebody else's data and even kernel data. And even if we assume that all our processes are not malicious, there is another drawback: before allocating memory each process need to know which memory regions are already occupied - this makes memory allocation for a process more complicated.
+RPi OSは現在、ユーザープロセスの実行とスケジュールができますが、プロセス間の隔離は
+完全ではなく、すべてのプロセスとカーネルが同じメモリを共有しています。このため、
+どのプロセスも他のプロセスのデータはもちろん、カーネルのデータにさえ簡単にアクセス
+できてしまいます。また、たとえすべてのプロセスが悪意を持っていないと仮定しても、
+別の欠点があります。各プロセスはメモリを割り当てる前にどのメモリ領域がすでに占有
+されているかを知る必要があり、これがプロセスのメモリ割り当てをより複雑にします。
 
-### Translation process
+### 変換過程
 
-In this lesson, we are going to fix all issues mentioned above by introducing virtual memory. Virtual memory provides each process with an abstraction that makes it think that it occupies all available memory. Each time a process needs to access some memory location it uses virtual address, which is translated into a physical address. The process of translation is done completely transparent for the process and is performed by a special device: MMU (Memory Mapping Unit). The MMU uses translation tables in order to translate a virtual address into a physical address. The process of translation is described in the following diagram.
+今回のレッスンでは、仮想メモリを導入することにより上記の問題点をすべて解決します。
+仮想メモリは、各プロセスに利用可能なすべてのメモリを占有していると思わせる抽象化を
+提供します。プロセスはあるメモリ位置にアクセスする必要がある場合は常に仮想アドレスを
+使用し、それが物理アドレスに変換されます。この変換過程はプロセスにとっては完全に
+透過的に行われ、MMU（Memory Mapping Unit）という特別なデバイスによって実行されます。
+MMUは変換テーブルを使用して仮想アドレスを物理アドレスに変換します。変換過程は
+次の図で説明できます。
 
 ```
                            Virtual address                                                                 Physical Memory
@@ -29,24 +40,51 @@ In this lesson, we are going to fix all issues mentioned above by introducing vi
                                                                                +--------------+          +------------------+
 ```
 
-The following facts are critical to understand this diagram and memory translation process in general.
+この図とメモリ変換過程を理解するためには以下の事実が重要です。
 
-* Memory for a process is always allocated in pages. A page is a contignious memory region 4KB in size (ARM processors support larger pages, but 4KB is the most common case and we are going to limit our discussion only to this page size).
-* Page tables have a hierarchical structure. An item in any of the tables contains an address of the next table in the hierarchy.
-* There are 4 levels in the table hierarchy: PGD (Page Global Directory), PUD (Page Upper Directory), PMD (Page Middle Directory), PTE (Page Table Entry). PTE is the last table in the hierarchy and it points to the actual page in the physical memory.
-* Memory translation process starts by locating the address of PGD (Page Global Directory) table. The address of this table is stored in the `ttbr0_el1` register. Each process has its own copy of all page tables, including PGD, and therefore each process must keep its PGD address. During a context switch, PGD address of the next process is loaded into the `ttbr0_el1`  register.
-* Next, MMU uses PGD pointer and virtual address to calculate the corresponding physical address. All virtual addresses use only 48 out of 64 available bits.  When doing a translation, MMU splits an address into 4 parts:
-  * Bits [39 - 47] contain an index in the PGD table. MMU uses this index to find the location of the PUD.
-  * Bits [30 - 38] contain an index in the PUD table. MMU uses this index to find the location of the PMD.
-  * Bits [21 - 29] contain an index in the PMD table. MMU uses this index to find the location of the PTE.
-  * Bits [12 - 20] contain an index in the PTE table. MMU uses this index to find a page in the physical memory.
-  * Bits [0 - 11] contain an offset in the physical page. MMU uses this offset to determine the exact position in the previously found page that corresponds to the original virtual address.
+* プロセス用のメモリは常にページ単位で割り当てられます。ページとは4KBサイズの連続した
+メモリ領域のことです（ARMプロセッサはより大きなページをサポートしていますが、4KBが
+最も一般的なケースなのでここではこのページサイズに限定して説明します）。
+* ページテーブルは階層構造になっています。どのテーブルのエントリも階層内の次のテーブルの
+アドレスを格納しています。
+* テーブル階層は次の4レベルです。PGD (Page Global Directory)、PUD (Page
+Upper Directory)、PMD (Page Middle Directory)、PTE (Page Table Entry)です。PTEが
+階層構造の最後のテーブルであり、物理メモリ上の実際のページを指しています。
+* メモリ変換過程は、PGDテーブルのアドレスを位置づけることから始まります。この
+テーブルのアドレスは`ttbr0_el1`レジスタに格納されます。各プロセスはPGDを含む
+すべてのページテーブルの独自のコピーを持つので、各プロセスはPGDアドレスを保持
+しなければなりません。コンテキストスイッチの際には、次のプロセスのPGDアドレスが`ttbr0_el1`レジスタにロードされます。
+* 次に、MMUはPGDポインタと仮想アドレスを使って対応する物理アドレスを計算します。
+すべての仮想アドレスは利用可能な64ビットのうち48ビットのみを使用します。変換を行う際、
+MMUはアドレスを次の4つの部分に分割します。
+  * ビット [39 - 47] はPGDテーブルのインデックスです。MMUはこのインデックスを使って、
+  PUDの位置を見つけます。
+  * ビット [30 - 38] はPUDテーブルのインデックスです。MMUはこのインデックスを使って、
+  PMDの位置を見つけます。
+  * ビット [21 - 29] はPMDテーブルのインデックスです。MMUはこのインデックスを使って、
+  PTEの位置を見つけます。
+  * ビット [12 - 20] はPTEテーブルのインデックスです。MMUはこのインデックスを使って、
+  物理メモリのページを見つけます。
+  * ビット [0 - 11] は物理ページ内のオフセットです。MMUはこのオフセットを使って、
+  先に見つけたページの仮想アドレスに対応する正確な位置を決定します。
 
-Now, let's make a small exercise and calculate the size of a page table. From the diagram above we know that index in a page table occupies 9 bits (this is true for all page table levels). This means that each page table contains `2^9 = 512` items. Each item in a page table is an address of either the next page table in the hierarchy or a physical page in case of PTE. As we are using a 64-bit processor, each address must be 64 bit or 8 bytes in size. Putting all of this together we can calculate that the size of a page table must be `512 * 8 = 4096` bytes or 4 KB. But this is exactly the size of a page! This might give you an intuition why MMU designers chose such numbers.
+では、ちょっとした練習として、ページテーブルのサイズを計算してみましょう。上の図
+から、ページテーブルのインデックスには9ビットが使われえていることがわかります
+（これはすべてのページテーブルレベルに当てはまります）。つまり、各ページテーブルには
+`2^9 = 512`個のエントリがあることになります。ページテーブルの各エントリは階層内の次の
+ページテーブルのアドレスか、PTEの場合は物理ページのアドレスです。私たちは64ビットの
+プロセッサを使用していますので、各アドレスは64ビット、つまり8バイトのサイズで
+なければなりません。これらを総合すると、ページテーブルのサイズは`512×8 ＝ 4096`
+バイト（4KB）となります。これはちょうど1ページの大きさです。MMUの設計者がなぜ
+このような数字を選んだのかが直感的に理解できるのではないでしょうか。
 
-### Section mapping
+### セクションマッピング
 
-There is one more thing that I want to discuss before we start looking at the source code: section mapping. Sometimes there is the need to map large parts of continuous physical memory. In this case, instead of 4 KB pages, we can directly map 2 MB blocks that are called sections. This allows to eliminate 1 level of translation. The translation diagram, in this case, looks like the following.
+ソースコードを見る前にもうひとつセクションマッピングについて説明しておきます。時には、
+連続した物理メモリの大きな領域をマッピングする必要がある場合もあります。この場合、
+4KBのページではなく、セクションと呼ばれる2MBのブロックを直接マッピングすることが
+できます。これにより、1レベルの変換を省略することができます。この場合の変換図は
+次のようになります。
 
 ```
                            Virtual address                                               Physical Memory
@@ -71,12 +109,18 @@ There is one more thing that I want to discuss before we start looking at the so
                                                                                        +------------------+
 ```
 
-As you can see the difference here is that now PMD contains a pointer to the physical section. Also, the offset occupies 21 bits instead of 12 bits (this is because we need 21 bits to encode a 2MB range)
+ここでの違いは、PMDが物理セクションへのポインタを含むようになったことです。また、
+オフセットには12ビットではなく21ビットを使用しています（2MBの範囲をエンコードする
+には21ビットが必要だからです）。
 
-### Page descriptor format
+### ページ記述子のフォーマット
 
-You may ask how does the MMU know whether PMD item points to a PTE or a physical 2 MB section? In order to answer this question we need to take a closer look at the structure of a page table item. Now I can confess that I wasn't quite accurate when claiming that an item in a page table always contains an address of either next page table or a physical page: each such item includes some other information as well. An item in a page table is called "descriptor". A description has a special format, which is described below.
-
+MMUは、PMDがPTEを指しているのか、2MBの物理セクションを指しているのかをどうやって
+知るのかという疑問があるかもしれません。この疑問に答えるためにはページテーブルエントリの
+構造を詳しく見てみる必要があります。ここで、ページテーブルのエントリには常に次の
+ページテーブルか物理ページのアドレスが含まれていると主張したのは正確ではなかった
+ことを告白します。そのようなエントリは他にも情報を含んでいるからです。ページテーブルの
+エントリは「記述子」と呼ばれます。記述子は次のような特別なフォーマットを持っています。
 
 ```
                            Descriptor format
@@ -86,19 +130,40 @@ You may ask how does the MMU know whether PMD item points to a PTE or a physical
  63                 47                     11                 2                 1           0
 ```
 
-The key thing to understand here is that each descriptor always points to something that is page aligned (either a physical page, a section or the next page table in the hierarchy). This means that last 12 bits of the address, stored in a descriptor, will always be 0. This also means that MUU can use those bits to store something more useful - and that is exactly what it does. Now let me explain the meaning of all bits in a descriptor.
+ここで理解すべき重要な点は、各記述子は常にページアラインされたもの（物理ページ、
+セクション、または次の階層のページテーブル）を指しているということです。これは、
+記述子に格納されるアドレスの最後の12ビットが常に0であることを意味します。事実
+そうなっています。ここで、ディスクリプタのすべてのビットの意味を説明します。
 
-* **Bit 0** This bit must be set to 1 for all valid descriptors. If MMU encounter non-valid descriptor during translation process a synchronous exception is generated. The kernel then should handle this exception, allocate a new page and prepare a correct descriptor (We will look in details on how this works a little bit later)
-* **Bit 1** This bit indicates whether the current descriptor points to a next page table in the hierarchy (we call such descriptor a "table descriptor") or it points instead to a physical page or a section (such descriptors are called "block descriptors").
-* **Bits [11:2]** Those bits are ignored for table descriptors. For block descriptors they contain some attributes that control, for example, whether the mapped page is cachable, executable, etc.
-* **Bits [47:12]**. This is the place where the address that a descriptor points to is stored. As I mentioned previously, only bits [47:12] of the address need to be stored, because all other bits are always 0.
-* **Bits [63:48]** Another set of attributes.
+* **ビット 0** このビットは有効な記述子ではすべて1に設定されなければなりません。
+MMUは変換過程中に無効な記述子に遭遇すると同期例外を生成します。カーネルはこの例外を
+処理して、新しいページを割り当て、正しい記述子を準備します（この仕組みについては
+後ほど詳しく説明します）。
+* **ビット 1** このビットは，現在の記述子が階層内の次のページテーブルを指して
+いるか（このような記述子を「テーブル記述子」と呼ぶ），物理的なページかセクションを
+指しているか（このような記述子を「ブロック記述子」と呼ぶ）を示します。
+* **ビット [11:2]** これらのビットはテーブル記述子では無視されます。ブロック
+記述子では、たとえば、マッピングされたページがキャッシュ可能か，実行可能かなど、
+を制御するいくつかの属性が含まれます。
+* **ビット [47:12]**. 記述子が指し示すアドレスが格納される場所です。先に述べた
+ように、他のビットは常に0であるため、アドレスの[47:12]ビットだけを格納する必要が
+あります。
+* **ビット [63:48]** もう一つの属性セットです。
 
-### Configuring page attributes
+### ページ属性を構成する
 
-As I mentioned in the previous section, each block descriptor contains a set of attributes that controls various virtual page parameters. However, the attributes that are most important for our discussion are not configured directly in the descriptor. Instead, ARM processors implement a trick, which allows them to save some space in the descriptor attributes section.
+前節で述べたように、ブロック記述子には様々な仮想ページパラメータを制御する一連の
+属性が含まれています。しかし、今回の議論にとって最も重要な属性は記述子では直接
+構成されません。代わりに、ARMプロセッサはあるトリックを実装して、記述子の
+属性セクションのスペースを節約できるようにしています。
 
-ARM.v8 architecture introduces `mair_el1` register. This register consists of 8 sections, each being 8 bits long. Each such section configures a common set of attributes. A descriptor then specifies just an index of the `mair` section, instead of specifying all attributes directly. This allows using only 3 bits in the descriptor to reference a `mair` section. The meaning of each bit in the `mair` section is described on the page 2609 of the `AArch64-Reference-Manual`. In the RPi OS we are using only a few of available attribute options. [Here](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/arm/mmu.h#L11)  is the code that prepares values for the `mair` register.
+ARM.v8アーキテクチャには`mair_el1`レジスタが導入されています。このレジスタは
+8つのセクションで構成されており、それぞれ8ビットの長さです。各セクションは
+共通属性セットを構成します。記述子はすべての属性を直接指定するのではなく、
+`mair`セクションのインデックスだけを指定します。これにより記述子の3ビットを
+使うだけで`mair`セクションを参照することができます。`mair`セクションの各ビットの
+意味は`AArch64-Reference-Manual`の2609ページに記載されています。RPi OSでは
+利用可能な属性オプションのほんの少ししか使用していません。[`mmu.h#L11`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/arm/mmu.h#L11)が`mair`レジスタの値を準備しているコードです。
 
 ```
 /*
@@ -110,34 +175,78 @@ ARM.v8 architecture introduces `mair_el1` register. This register consists of 8 
  *   NORMAL_NC        001    01000100
  */
 #define MT_DEVICE_nGnRnE         0x0
-#define MT_NORMAL_NC            0x1
-#define MT_DEVICE_nGnRnE_FLAGS        0x00
-#define MT_NORMAL_NC_FLAGS          0x44
+#define MT_NORMAL_NC             0x1
+#define MT_DEVICE_nGnRnE_FLAGS   0x00
+#define MT_NORMAL_NC_FLAGS       0x44
 #define MAIR_VALUE            (MT_DEVICE_nGnRnE_FLAGS << (8 * MT_DEVICE_nGnRnE)) | (MT_NORMAL_NC_FLAGS << (8 * MT_NORMAL_NC))
 ```
 
-Here we are using only 2 out of 8 available slots in the `mair` registers. The first one corresponds to device memory and second to normal non-cachable memory. `MT_DEVICE_nGnRnE` and `MT_NORMAL_NC` are indexes that we are going to use in block descriptors, `MT_DEVICE_nGnRnE_FLAGS` and `MT_NORMAL_NC_FLAGS` are values that we are storing in the first 2 slots of the `mair_el1` register.
+ここでは`mair`レジスターの8つの利用可能なスロットのうち、2つだけを使用しています。
+最初のスロットはデバイスメモリに，2番目のスロットは通常のキャッシュ不可能なメモリに
+対応します。`MT_DEVICE_nGnRnE`と`MT_NORMAL_NCPはブロック記述子で使用する
+インデックスであり、`MT_DEVICE_nGnRnE_FLAGS`と`MT_NORMAL_NC_FLAGS`は`mair_el1`
+レジスタの最初の2スロットに格納する値です。
 
-### Kernel vs user virtual memory
+### カーネル仮想メモリとユーザ仮想メモリ
 
-After the MMU is switched on, each memory access must use virtual memory instead of physical memory. One consequence of this fact is that the kernel itself must be prepared to use virtual memory and maintain its own set of page tables. One possible solution could be to reload `pgd`  register each time we switch from user to kernel mode. The problem is that switching `pgd` is very expensive operation because it requires the invalidation of all caches. Having in mind how often we need to switch from user mode to kernel mode, this solution would make caching completely useless and therefore this solution is never used in OS development. What operating system are doing instead is splitting address space into 2 parts: user space and kernel space. 32-bit architectures usually allocate first 3 GB of the address space for user programs and reserve last 1 GB for the kernel. 64-bit architectures are much more favorable in this regard because of their huge address space. And even more: ARM.v8 architecture comes with a native feature that can be used to easily implement user/kernel address split.
+MMUを有効にした後は、メモリアクセスには物理メモリではなく仮想メモリを使用しなければ
+なりません。このため、カーネル自身も仮想メモリを使用する準備をして、独自のページ
+テーブルを保持しなければならなくなります。この解決策として、ユーザモードから
+カーネルモードに切り替わるたびに`pgd`レジスタをリロードすることが考えられます。
+問題は`pgd`の切り替えは非常に高価な操作であるということです。なぜなら、すべての
+キャッシュを無効にする必要があるからです。ユーザモードからカーネルモードへの
+切り替えをどれほど頻繁に行わないといけないかを考えると、この解決策ではキャッシュが
+全く役に立たなくなるため、OS開発ではこの解決策は決して使用されません。代わりにOSが
+行っているのは、アドレス空間をユーザ空間とカーネル空間の2つに分けることです。
+32ビットアーキテクチャでは、通常、アドレス空間の最初の3GBをユーザプログラムの
+ための空間に割り当て、最後の1GBをカーネル用に確保します。64ビットアーキテクチャは
+アドレス空間が巨大なのでこの点でははるかに有利です。さらに、それだけではありません。
+ARM.v8アーキテクチャには、ユーザアドレスとカーネルアドレスの分割を簡単に実現する
+ためのネイティブ機能が備わっています。
 
-There are 2 registers that can hold the address of the PGD: `ttbr0_el1` and `ttbr1_el1`. As you might remember we are using only 48 bits in the addresses out of 64 available, so the upper 16 bits can be used to distinguish between `ttbr0`  and `ttbr1` translation processes. If upper 16 bits are all equal to 0 then PGD address stored in `ttbr0_el1` is used, and if the address starts with `0xffff`(first 16 bit are all equal to 1) then PGD address stored in the `ttbr1_el1` is selected. The architecture also ensures that a process running at EL0 can never access virtual addresses started with `0xffff` without generating a synchronous exception.  From this description, you can easily infer that a pointer to the kernel PGD is stored in the `ttbr1_el1` and is kept there throughout the life of the kernel, and `ttbr0_el1` is used to store current user process PGD.
+PGDのアドレスを保持できるレジスタが2つ存在します。`ttbr0_el1`と`ttbr1_el1`です。
+覚えているかもしれないが、我々はアドレスに利用可能な64 ビットのうち48 ビットしか
+使っていませんので、上位16ビットを使って`ttbr0`と`ttbr1`の変換プロセスを区別
+することができます。上位16ビットがすべて0であれば、`ttbr0_el1`に格納されている
+PGDアドレスが使われ、アドレスが`0xffff`で始まる（最初の16ビットがすべて1の場合)
+場合は、`ttbr1_el1`に格納されている PGD アドレスが選択されるようになっています。
+また、EL0で実行されているプロセスは、同期例外を発生させること以外には、`0xffff`で
+始まる仮想アドレスに絶対にアクセスできないようになっています。この説明から、
+カーネルPGDへのポインタは`ttbr1_el1`に格納され、カーネルが存在する限りそこに
+保持されること、`ttbr0_el1`はカレントユーザプロセスのPGDを格納するために使用される
+ことが容易に推測できるでしょう。
 
-One implication of this approach is that all absolute kernel addresses must start with `0xffff`. There are 2 places in the RPi OS source code, were we handle this. In the [linker script](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/linker.ld#L3) we specify base address of the image as `0xffff000000000000`. This will make the compiler think that our image is going to be loaded at `0xffff000000000000` address, and therefore whenever it needs to generate an absolute address it will make it right. (There are a few more changes to the linker script, but we will discuss them later.)
+このアプローチが意味することの一つは、カーネルの絶対アドレスはすべて`0xffff`で
+始まらなければならないことです。RPi OSのソースコードにはこれを処理する箇所が
+2箇所あります。[リンカスクリプト](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/linker.ld#L3)では
+イメージのベースアドレスを`0xffff000000000000`と指定しています。これにより
+コンパイラはイメージがアドレス`0xffff000000000000`にロードされると考え、絶対番地を
+生成する必要がある際には常に正しいアドレスを生成します(リンカスクリプトにはさらに
+いくつかの変更点がありますが、それについては後述します)。
 
-There is one more place were we hardcode absolute kernel base addresses: in the [header](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/peripherals/base.h#L7) where we define device base address. Now we will access all device memory starting from `0xffff00003F000000` Certainly, in order for this to work, we need first to map all memory, which kernel needs to access. In the next section we will explore in detail the code that creates this mapping.
+カーネルの絶対ベースアドレスがハードコードされている場所がもう一つあります。
+デバイスのベースアドレスを定義している[ヘッダ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/peripherals/base.h#L7)です。
+これにより`0xffff00003F000000`から始まるすべてのデバイスメモリにアクセスできるように
+なります。実際には、これを実現するためには、まずカーネルがアクセスする必要のある
+すべてのメモリをマッピングする必要があります。次節では、このマッピングを作成する
+コードについて詳しく見ていきます。
 
-### Initializing kernel page tables
+### カーネルページテーブルを初期化する
 
-The process of creating kernel page tables is something that we need to handle very early in the boot process. It starts in the [boot.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L42) file. Right after we switch to EL1 and clear the BSS [__create_page_tables](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L92) function is called. Let's examine it line by line.
+カーネルページテーブルを作成するプロセスは、ブートプロセスの非常に早い段階で処理する必要があります。このプロセスは[boot.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L42)
+ファイルで始まります。EL1に切り替えてBSSをクリアした直後に[__create_page_tables](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L92)
+関数が呼び出されます。一行ずつ見ていきましょう。
 
 ```
 __create_page_tables:
     mov    x29, x30                        // save return address
 ```
 
-First, the function saves `x30` (link register). As we are going to call other functions from `__create_page_tables`, `x30` will be overwritten. Usually `x30` is saved on the stack but, as we know that we are not going to use recursion and nobody else will use `x29` during `__create_page_tables` execution, this simple method of preserving link register also works fine.
+まず、この関数は`x30`(リンクレジスタ)を保存します。`create_page_tables`
+から他の関数を読んでいく過程で`x30`は上書きされるからです。通常、`x30`は
+スタックに保存されますが、`__create_page_tables`の実行中に再帰は
+使用せれず、`x29`が使用されないことも分かっているので、リンクレジスタを
+保存するこの単純な方法も問題ありません。
 
 ```
     adrp    x0, pg_dir
@@ -145,12 +254,32 @@ First, the function saves `x30` (link register). As we are going to call other f
     bl     memzero
 ```
 
-Next, we clear the initial page tables area. An important thing to understand here is where this area is located and how do we know its size? Initial page tables area is defined in the [linker script](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/linker.ld#L20) - this means that we are allocating the spot for this area in the kernel image itself. Calculating the size of this area is a little bit trickier. First, we need to understand the structure of the initial kernel page tables. We know that all our mappings are all inside 1 GB region (this is the size of RPi memory). One PGD descriptor can cover `2^39 = 512 GB`  and one PUD descriptor can cover `2^30 = 1 GB` of continuous virtual mapping area. (Those values are calculated based on the PGD and PUD indexes location in the virtual address.) This means that we need just one PGD and one PUD to map the whole RPi memory, and even more - both PGD and PUD will contain a single descriptor. If we have a single PUD entry there also must be a single PMD table, to which this entry will point. (Single PMD entry covers 2 MB, there are 512 items in a PMD, so in total the whole PMD table covers the same 1 GB of memory that is covered by a single PUD descriptor.)
-Next, we know that we need to map 1 GB region of memory, which is a multiple of 2 MB - so we can use section mapping. This means that we don't need PTE at all. So in total, we need 3 pages: one for PGD, PUD and PMD - this is precisely the size of the initial page table area.
+次に、初期ページテーブル領域をクリアします。ここで覚えておくべき重要な
+ことは、この領域がどこにあり、そのサイズをどうやって知るかということです。
+初期ページテーブル領域は[リンカスクリプト](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/linker.ld#L20)
+で定義されています。これはカーネルイメージの中にこの領域の場所を確保して
+いることを意味します。この領域のサイズの計算は少し大変です。まず、初期の
+カーネルページテーブルの構造を理解する必要があります。私たちのマッピングは
+すべて1GBの領域内にあることがわかっています（これはRPiのメモリの大きさ
+です）。1つのPGD記述子で`2^39 = 512GB`、1つのPUD記述子で`2^30 = 1GB`の
+連続した仮想マッピング領域をカバーできます。(これらの値は、仮想アドレス
+におけるPGDとPUDのインデックスの位置に基づいて計算されます)。これは1つの
+PGDと1つのPUDだけでRPiのすべてのメモリをマッピングすることができ、さらに、
+PGDもPUDも1つの記述子だけが含まれることを意味します。PUDのエントリが1つで
+あれば、PMDテーブルも1つでなければならず、PUDエントリはこのテーブルを指す
+ことになります。（1つのPMDエントリは2MBをカバーし、PMDには512個のエントリが
+あるので、全体では、1つのPUD記述子がカバーする範囲と同じ1GBのメモリを
+PMDテーブルがカバーすることになります）。次に、1GBのメモリ領域をマッピング
+する必要があることがわかっており、これは2MBの倍数であるので、セクション
+マッピングを使用することができます。つまり、PTEは不要だということです。
+結局、必要なのは3ページだけです。PGD、PUD、PMD用に各1ページずつです。
+これが初期ページテーブル領域の正確なサイズです。
 
-Now we are going to step outside `__create_page_tables` function and take a look on 2 essential macros: [create_table_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L68) and [create_block_map](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L77).
+次に、`__create_page_tables`関数の外に出て、2つの重要なマクロである[create_table_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L68)と[create_block_map](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L77)を
+見てみましょう。
 
-`create_table_entry` is responsible for allocating a new page table (In our case either PGD or PUD) The source code is listed below.
+`create_table_entry`は、新しいページテーブル（ここではPGDまたはPUD）を
+割り当てる役割を果たします。ソースコードを以下に示します。
 
 ```
     .macro    create_table_entry, tbl, virt, shift, tmp1, tmp2
@@ -163,47 +292,62 @@ Now we are going to step outside `__create_page_tables` function and take a look
     .endm
 ```
 
-This macro accepts the following arguments.
+このマクロは、次の引数を受け付けます。
 
-* `tbl` - a pointer to a memory region were new table has to be allocated.
-* `virt` - virtual address that we are currently mapping.
-* `shift` - shift that we need to apply to the virtual address in order to extract current table index. (39 in case of PGD and 30 in case of PUD)
-* `tmp1`, `tmp2` - temporary registers.
+* `tbl` - 新しいテーブルを割り当てるメモリ領域へのポインタ
+* `virt` - 現在マッピングしている仮想アドレス
+` `shift` - 現在のテーブルインデックスを抽出するために仮想アドレスに
+適用するシフト（PGDの場合は39、PUDの場合は30）
+* `tmp1`, `tmp2` - 一時的なレジスタ
 
-This macro is very important, so we are going to spend some time understanding it.
+このマクロは非常に重要なので、これから時間をかけて理解していきます。
 
 ```
     lsr    \tmp1, \virt, #\shift
-    and    \tmp1, \tmp1, #PTRS_PER_TABLE - 1            // table index
+    and    \tmp1, \tmp1, #PTRS_PER_TABLE - 1   // tmp1: table index: #PTRS_PER_TABLE-1 = 0xff
 ```
 
-The first two lines of the macro are responsible for extracting table index from the virtual address. We are applying right shift first to strip everything to the right of the index and then using `and` operation to strip everything to the left.
+マクロの最初の2行では仮想アドレスからテーブルインデックスを抽出しています。
+最初に右シフトを適用してインデックスの右にあるものをすべて取り除いだ後に
+`and`演算を使用して左にあるものをすべて取り除いています。
 
 ```
-    add    \tmp2, \tbl, #PAGE_SIZE
+    add    \tmp2, \tbl, #PAGE_SIZE      // tmp2: addres of next tbl page
 ```
 
-Then the address of the next page table is calculated. Here we are using the convention that all our initial page tables are located in one continuous memory region. We simply assume that the next page table in the hierarchy will be adjacent to the current page table.
+そして、次のページテーブルのアドレスが計算されます。ここでは、すべての
+初期ページテーブルは1つの連続したメモリ領域に配置されるという慣習を
+利用しています。つまり、階層の次のページテーブルは現在のページテーブルに
+隣接していると仮定しています。
 
 ```
-    orr    \tmp2, \tmp2, #MM_TYPE_PAGE_TABLE
+    orr    \tmp2, \tmp2, #MM_TYPE_PAGE_TABLE // (tmp2 | 0b11)
 ```
 
-Next, a pointer to the next page table in the hierarchy is converted to a table descriptor. (A descriptor must have 2 lower bits set to `1`)
+次に、階層の次のページテーブルへのポインタをテーブル記述子に変換します
+（記述子の下位2ビットは1にする必要があります）。
 
 ```
-    str    \tmp2, [\tbl, \tmp1, lsl #3]
+    str    \tmp2, [\tbl, \tmp1, lsl #3]    // tbl[index * 8]
 ```
 
-Then the descriptor is stored in the current page table. We use previously calculated index to find the right spot in the table.
+そして、記述子を現在のページテーブルに格納します。以前に計算した
+インデックスを使って、テーブル中の正しい場所を探します。
 
 ```
-    add    \tbl, \tbl, #PAGE_SIZE                    // next level table page
+    add    \tbl, \tbl, #PAGE_SIZE       // 次レベルのテーブルページ
 ```
 
-Finally, we change `tbl` parameter to point to the next page table in the hierarchy. This is convenient because now we can call `create_table_entry` one more time for the next table in the hierarchy without making any adjustments to the `tbl` parameter. This is precisely what we are doing in the [create_pgd_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L63) macro, which is just a wrapper that allocates both PGD and PUD.
+最後に、`tbl`パラメータを次階層のページテーブルを指すように変更します。
+これは利便性のためであり、`tbl`パラメータを調整することなく次階層の
+テーブルに対して`create_table_entry`を再度呼び出すことができます。
+これはまさに[create_pgd_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/boot.S#L63)
+マクロで行っていることであり、このマクロはPGDとPUDの双方を割り当てる
+ラッパーに過ぎません。
 
-Next important macro is`create_block_map` As you might guess this macro is responsible for populating entries of the PMD table. It looks like the following.
+次に重要なマクロはcreate_block_map`です。ご想像のとおり、このマクロは
+PMDテーブルのエントリを生成する役割を担っています。ソースは以下のように
+なっています。
 
 ```
     .macro    create_block_map, tbl, phys, start, end, flags, tmp1
@@ -222,30 +366,33 @@ Next important macro is`create_block_map` As you might guess this macro is respo
     .endm
 ```
 
-Parameters here are a little bit different.
+ここでのパラメータは少し異なります。
 
-* `tbl` - a pointer to the PMD table.
-* `phys` - the start of the physical region to be mapped.
-* `start` - virtual address of the first section to be mapped.
-* `end` - virtual address of the last section to be mapped.
-* `flags` - flags that need to be copied into lower attributes of the block descriptor.
-* `tmp1` - temporary register.
+* `tbl` - PMDテーブルへのポインタ
+* `phys` - マッピングする物理領域の開始点
+* `start` - マッピングする最初のセクションの仮想アドレス
+* `end` - マッピングする最後のセクションの仮想アドレス
+* `flags` - ブロック記述子の下位属性にコピーするフラグ
+* `tmp1` - 一時的なレジスタ
 
-Now, let's examine the source.
+では，ソースを見てみましょう。
 
 ```
     lsr    \start, \start, #SECTION_SHIFT
     and    \start, \start, #PTRS_PER_TABLE - 1            // table index
 ```
 
-Those 2 lines extract the table index from `start` virtual address. This is done exactly in the same way as we did it before in the `create_table_entry` macro.
+この2行は*start*仮想アドレスからテーブルインデックスを抽出しています。
+これは、既に見た`create_table_entry`マクロで行った方法と全く同じ方法で
+行っています。
 
 ```
     lsr    \end, \end, #SECTION_SHIFT
     and    \end, \end, #PTRS_PER_TABLE - 1                // table end index
 ```
 
-The same thing is repeated for the `end` address. Now both `start` and `end` contains not virtual addresses, but indexes in the PMD table, corresponding to the original addresses.
+同じことを`end`アドレスにも行います。これで`start`と`end`は仮想アドレス
+ではなく、元のアドレスに対応するPMDテーブルのインデックスになりました。
 
 ```
     lsr    \phys, \phys, #SECTION_SHIFT
@@ -253,7 +400,12 @@ The same thing is repeated for the `end` address. Now both `start` and `end` con
     orr    \phys, \tmp1, \phys, lsl #SECTION_SHIFT            // table entry
 ```
 
-Next, block descriptor is prepared and stored in the `tmp1` variable. In order to prepare the descriptor `phys` parameter is first shifted to right then shifted back and merged with the `flags` parameter using `orr` instruction. If you wonder why do we have to shift the address back and forth - the answer is that this clears first 21 bit in the `phys` address and makes our macro universal, allowing it to be used with any address, not just the first address of the section.
+次に，ブロックディスクリプタを作成し，変数`tmp1`に格納します。記述子を
+作成するために、`phys`パラメータをまず右にシフトしてからシフトバック
+し、`orr`命令で`flags`パラメータをマージします。なぜアドレスを前後に
+ずらすのかというと、`phys`アドレスの最初の21ビットをクリアすることで、
+マクロを汎用化して、セクションの最初のアドレスだけでなく、どのアドレス
+でも使用できるようにするためです。
 
 ```
 9999:    str    \phys, [\tbl, \start, lsl #3]                // store the entry
@@ -263,9 +415,15 @@ Next, block descriptor is prepared and stored in the `tmp1` variable. In order t
     b.ls    9999b
 ```
 
-The final part of the function is executed inside a loop. Here we first store current descriptor at the right index in the PMD table. Next, we increase current index by 1 and update the descriptor to point to the next section. We repeat the same process until current index becomes equal to the last index.
+このマクロの最後の部分はループ内で実行されます。ここではまず
+現在の記述子をPMDテーブルの正しいインデックスに格納します。次に，
+現在のインデックスを1つ増やし，次のセクションを指すように記述子を
+更新します。現在のインデックスが最後のインデックスと等しくなるまで、
+同じ処理を繰り返します。
 
-Now, when you understand how `create_table_entry` and `create_block_map` macros work, it will be straightforward to understand the rest of the `__create_page_tables` function.
+`create_table_entry`マクロと`create_block_map`マクロがどのように
+動作するかを理解したら、`__create_page_tables`関数の残りの部分は
+簡単に理解できでしょう。
 
 ```
     adrp    x0, pg_dir
@@ -273,7 +431,10 @@ Now, when you understand how `create_table_entry` and `create_block_map` macros 
     create_pgd_entry x0, x1, x2, x3
 ```
 
-Here we create both PGD and PUD. We configure them to start mapping from [VA_START](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/mm.h#L6) virtual address. Because of the semantics of the `create_table_entry` macro, after `create_pgd_entry`  finishes `x0` will contain the address of the next table in the hierarchy - namely PMD.
+ここでPGDとPUDを作成します。このテーブルのマッピングを[VA_START](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/mm.h#L6)
+仮想アドレスから開始するように構成しています。`create_table_entry`マクロの
+作りにより、`create_pgd_entry`が完了した際に`x0`には次階層のテーブル、
+すなわちPMDのアドレスが格納されています。
 
 ```
     /* Mapping kernel and init stack*/
@@ -283,7 +444,11 @@ Here we create both PGD and PUD. We configure them to start mapping from [VA_STA
     create_block_map x0, x1, x2, x3, MMU_FLAGS, x4
 ```
 
-Next, we create virtual mapping of the whole memory, excluding device registers region. We use [MMU_FLAGS](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/arm/mmu.h#L24) constant as `flags` parameter - this marks all sections to be mapped as normal noncacheable memory. (Note, that `MM_ACCESS` flag is also specified as part of `MMU_FLAGS` constant. Without this flag each memory access will generate a synchronous exception.)
+次に、デバイスレジスタ領域を除く、全メモリ領域の仮想マッピングを作成
+します。`flags`パラメータとして[MMU_FLAGS](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/arm/mmu.h#L24)
+定数を使用します。これはマッピングされるすべてのセクションを通常の
+キャッシュなしメモリとしてマークします（`MMU_FLAGS`定数の一部として、`MM_ACCESS`フラグも指定されることに注意してください。このフラグを
+指定しないとメモリアクセスのたびに同期例外が発生します）。
 
 ```
     /* Mapping device memory*/
@@ -293,46 +458,55 @@ Next, we create virtual mapping of the whole memory, excluding device registers 
     create_block_map x0, x1, x2, x3, MMU_DEVICE_FLAGS, x4
 ```
 
-Then device registers region is mapped. This is done exactly in the same way as in the previous code sample, with the exception that we are now using different start and end addresses and different flags.
+次にデバイスレジスタ領域をマッピングします。これは前述のコードサンプルと
+全く同じ方法で行われますが、開始アドレスと終了アドレス、フラグが
+異なります。
 
 ```
     mov    x30, x29                        // restore return address
     ret
 ```
 
-Finally, the function restored link register and returns to the caller.
+最後に、リンクレジスタを復元し、呼び出し元に戻ります。
 
-### Configuring page translation
+### ページ変換を構成する
 
-Now page tables are created and we are back to the `el1_entry` function. But there is still some work to be done before we can switch on the MMU. Here is what happens.
+ページテーブルを作成したので、`el1_entry`関数に戻ります。ただし、
+MMUのスイッチを入れるにはまだやるべきことがあります。ここでは
+その作業を紹介します。
 
 ```
     mov    x0, #VA_START
     add    sp, x0, #LOW_MEMORY
 ```
 
-We are updating init task stack pointer. Now it uses a virtual address, instead of a physical one. (Therefore it could be used only after MMU is on.)
+initタスクのスタックポインタを更新します。これにより物理アドレスでは
+なく、仮想アドレスを使用するようになります(そのため、initタスクは
+MMUがオンになった後でしか使用できなくなります)。
 
 ```
     adrp    x0, pg_dir
     msr    ttbr1_el1, x0
 ```
 
-`ttbr1_el1` is updated to point to the previously populated PGD table.
+`ttbr1_el1`を先に作成したPGDテーブルを指すように更新します。
 
 ```
     ldr    x0, =(TCR_VALUE)
     msr    tcr_el1, x0
 ```
 
-`tcr_el1` of Translation Control Register is responsible for configuring some general parameters of the MMU. (For example, here we configure that both kernel and user page tables should use 4 KB pages.)
+変換制御レジスタである`tcr_el1`はMMUの一般的なパラメータを設定する役割を
+担っています（たとえば、ここでは、カーネルとユーザーのページテーブルが
+4KBページを使用するように設定しています）。
 
 ```
     ldr    x0, =(MAIR_VALUE)
     msr    mair_el1, x0
 ```
 
-We already discussed `mair` register in the "Configuring page attributes" section. Here we just set its value.
+`mair`レジスタについては「ページ属性を構成する」の節ですでに説明しました。
+ここでは、その値を設定しているだけです。
 
 ```
     ldr    x2, =kernel_main
@@ -343,12 +517,37 @@ We already discussed `mair` register in the "Configuring page attributes" sectio
     br     x2
 ```
 
-`msr    sctlr_el1, x0` is the line where MMU is actually enabled. Now we can jump to the `kernel_main` function. An interesting question is why can't we just execute `br kernel_main` instruction? Indeed, we can't. Before the MMU was enabled we have been working with physical memory, the kernel is loaded at a physical offset 0 - this means that current program counter is very close to 0. Switching on the MMU doesn't update the program counter. If we now execute `br kernel_main` instruction, this instruction will use offset relative to the current program counter and jumps to the place were `kernel_main` would have been if we don't turn on the MMU. `ldr    x2, =kernel_main` on the other hand loads `x2` with the absolute address of the `kernel_main` function. Because of the fact that we set the image base address to `0xffff000000000000` in the linker script, the absolute address of the `kernel_main` function will be calculated as an offset from the beginning of the image plus `0xffff000000000000` - which is exactly what we need.
-Another important thing that you need to understand is why `ldr    x2, =kernel_main` instruction must be executed before we turn on the MMU. The reason is that `ldr` also uses `pc` relative offset, so if we try to execute this instruction after MMU is on but before we jump to the image base address, the instruction will generate a page fault.
+`msr sctlr_el1, x0`が実際にMMUが有効になる行です。ようやく`kernel_main`
+関数にジャンプすることができます。しかし、なぜ単に`br kernel_main`命令を
+実行できないのかという興味深い疑問が残ります。実際できません。MMUが有効に
+なる前には、物理メモリで作業しており、カーネルは物理オフセット0にロード
+されています。これは現在のプログラムカウンタが0に非常に近い値であることを
+意味します。MMUをオンにしてもプログラムカウンタは更新されません。今、
+`br kernel_main`命令を実行すると、この命令は現在のプログラムカウンタ
+相対のオフセットを使用し、MMUをオンにしなかったら`kernel_main`があった
+であろう場所にジャンプします。一方、`ldr    x2, =kernel_main`は
+`kernel_main`関数の絶対アドレスを持つ`x2`をロードします。リンカ
+スクリプトでイメージのベースアドレスに`0xffff000000000000`を設定した
+ので、`kernel_main`関数の絶対アドレスはイメージの先頭からのオフセットに
+`0xffff000000000000`を加えたものとして計算されます。これはまさに私たち
+が必要とするものです。もうひとつ理解する必要のある重要なことは、
+`ldr x2, =kernel_main`命令はなぜMMUをオンにする前に実行しなければならない
+かです。その理由は`ldr`も`pc`相対オフセットを使用するからです。MMUを
+オンにしたがイメージベースアドレスにまだジャンプしていない時にこの命令を
+実行しようとすると、ページフォルトが発生してしまいます。
 
-### Allocating user processes
+### ユーザプロセスを割り当てる
 
-If you work with a real OS you would probably expect it to be capable of reading your program from the file system and executing it. This is different for the RPi OS - it doesn't have file system support yet. We were not bothered by this fact in the previous lessons, because user processes shared the same address space with the kernel. Now things have changed and each process should have its own address space, so we need to figure out how to store the user program so we can later load it into the newly created process. The trick that I end up implementing is to store the user program in a separate section of the kernel image. Here is the relevant section of the linker script that is responsible for doing this.
+実際のOSを使っている場合、おそらくプログラムをファイルシステムから
+読み込んで実行できることを期待するでしょう。これはRPi OSでは違います。
+RPi OSはまだファイルシステムをサポートしていないからです。これまでの
+レッスンでは、ユーザプロセスはカーネルと同じアドレス空間を共有していた
+ので、この事実に悩まされることはありませんでした。しかし、今や状況は
+変わり、各プロセスは独自のアドレス空間を持つ必要があります。そこで、
+ユーザプログラムを保存し、後で新しく作成したプロセスにロードできるように
+する方法を考えなければなりません。最終的に実装したトリックは、ユーザ
+プログラムをカーネルイメージの別のセクションに格納するというもんです。
+これを行うためのリンカスクリプトの関連セクションは次のとおりです。
 
 ```
     . = ALIGN(0x00001000);
@@ -360,16 +559,33 @@ If you work with a real OS you would probably expect it to be capable of reading
     user_end = .;
 ```
 
-I made a convention that user level source code should be defined in the files with `user` prefix. The linker script then can isolate all user related code in a continuous region and define `user_begin` and `user_end` variables, which mark the beginning and end of this region. In this way we can simply copy everything between `user_begin` and `user_end` to the newly allocated process address space, thus simulating loading a user program. This is simple enough and works well for our current purpose, but after we implement file system support and will be able to load ELF files we will get rid of this hack.
+私は、ユーザレベルのソースコードは`user`という接頭辞を持つファイルに
+定義しなければならないという規約を作りました。これにより、リンカス
+クリプトはユーザ関連のコードを連続した領域に分離し、その領域の始まりと
+終わりを示す`user_begin`と`user_end`変数を定義することができます。
+このような方法で`user_begin`と`user_end`の間にあるすべてのものを
+新しく割り当てたプロセスアドレス空間にコピーするだけで、ユーザ
+プログラムのロードをシミュレートすることができます。この方法は
+シンプルで、現在の目的にはうまく動きますが、ファイルシステムの
+サポートを実装し、ELFファイルをロードできるようになったら、このハックは
+取り除く予定です。
 
-Right now there are 2 files that are compiled in the user region.
+今のところ、ユーザ領域には2つのファイルがコンパイルされます。
 
-* [user_sys.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/user_sys.S) This file contains definitions of the syscall wrapper functions. The RPi OS still supports the same syscalls as in the previous lesson, with the exception that now instead of `clone` syscall we are going to use `fork` syscall. The difference is that `fork` copies process virtual memory, and that is something we want to try doing.
-* [user.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/user.c) User program source code. Almost the same as we've used in the previous lesson.
+* [user_sys.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/user_sys.S) このファイルにはシステムコールの
+ラッパー関数の定義が含まれています。RPi OSは前回のレッスンと同じ
+システムコールをサポートしていますが、`clone`システムコールの代わりに
+`fork`システムコールを使用することが違います。その違いは`fork`は
+プロセスの仮想メモリをコピーすることであり，それがやってみたいことで
+です。
+* [user.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/user.c) ユーザプログラムのソースコードです。前回の
+レッスンで使ったものとほとんど同じです。
 
-### Creating first user process
+### 最初のユーザプロセスを作成する
 
-As it was the case in the previous lesson, [move_to_user_mode](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/fork.c#L44) function is responsible for creating the first user process. We call this function from a kernel thread. Here is how we do this.
+先のレッスンでもそうでしたが、[move_to_user_mode](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/fork.c#L44)
+関数は最初のユーザプロセスを作成する役割を担っています。この関数は
+カーネルスレッドから呼び出します。以下はその方法です。
 
 ```
 void kernel_process(){
@@ -384,9 +600,12 @@ void kernel_process(){
 }
 ```
 
-Now we need 3 arguments to call `move_to_user_mode`: a pointer to the beginning of the user code area, size of the area and offset of the startup function inside it. This information is calculated based on the previously discussed `user_begin`  and `user_end` variables.
+`move_to_user_mode`の呼び出しには3つの引数が必要です。ユーザコード領域の
+先頭へのポインタ、領域のサイズ、領域中のスタートアップ関数のオフセット
+です。この情報は、先に説明した`user_begin`と`user_end`変数に基づいて
+計算されます。
 
-`move_to_user_mode` function is listed below.
+`move_to_user_mode`関数のコードを以下に示します。
 
 ```
 int move_to_user_mode(unsigned long start, unsigned long size, unsigned long pc)
@@ -405,25 +624,27 @@ int move_to_user_mode(unsigned long start, unsigned long size, unsigned long pc)
 }
 ```
 
-Now let's try to inspect in details what is going on here.
+では、ここで何が行われているか詳しく見ていきましょう。
 
 ```
     struct pt_regs *regs = task_pt_regs(current);
 ```
 
-As it was the case in the previous lesson, we obtain a pointer to `pt_regs` area and set `pstate`, so that after `kernel_exit` we will end up in EL0.
+前回のレッスンと同様に`pt_regs`領域へのポインタを取得し、`pstate`を
+設定して`kernel_exit`後にEL0になるようにします。
 
 ```
     regs->pc = pc;
 ```
 
-`pc` now points to the offset of the startup function in the user region.
+`pc`はユーザ領域におけるスタートアップ関数のオフセットを指すようになります。
 
 ```
     regs->sp = 2 *  PAGE_SIZE;
 ```
 
-We made a simple convention that our user program will not exceed 1 page in size. We allocate the second page to the stack.
+ユーザプログラムのサイズは1ページを超えないというシンプルな規約を
+設けました。そして、スタック用にもう1ページ割り当てます。
 
 ```
     unsigned long code_page = allocate_user_page(current, 0);
@@ -432,29 +653,50 @@ We made a simple convention that our user program will not exceed 1 page in size
     }
 ```
 
-`allocate_user_page` reserves 1  memory page and maps it to the virtual address, provided as a second argument. In the process of mapping it populates page tables, associated with the current process. We will investigate in details how this function works later in this chapter.
+`allocate_user_page`は1メモリページを確保して、第2引数として提供される
+仮想アドレスにマッピングします。マッピングの過程でカレントプロセスに
+関連するページテーブルが作成されます。この関数がどのように動作するかは
+この章で後ほど詳しく調べます。
 
 ```
     memcpy(code_page, start, size);
 ```
 
-Next, we are going to copy the whole user region to the new address space (in the page that we have just mapped), starting from offset 0, so the offset in the user region will become an actual virtual address of the starting point.
+次に、ユーザ領域のすべてを（マップしたばかりのページの）新規アドレス
+空間にコピーします。オフセット0から開始するのでユーザ領域のオフセットは
+開始時点における実際の仮想アドレスになります。
 
 ```
     set_pgd(current->mm.pgd);
 ```
 
-Finally, we call [set_pgd](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/utils.S#L24), which updates `ttbr0_el1` register and thus activate current process translation tables.
+最後に、[set_pgd](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/utils.S#L24)
+を呼び出します。これは`ttbr0_el1`レジスタを更新し、カレントプロセスの
+変換テーブルをアクティブにします。
 
 ### TLB (Translation lookaside buffer)
 
-If you take a look at the `set_pgd` function you will see that after it sets `ttbr0_el1` it also clears [TLB](https://en.wikipedia.org/wiki/Translation_lookaside_buffer) (Translation lookaside buffer). TLB is a cache that is designed specifically to store the mapping between physical and virtual pages. The first time some virtual address is mapped into a physical one this mapping is stored in TLB. Next time we need to access the same page we no longer need to perform full page table walk. Therefore it makes perfect sense that we invalidate TLB after updating page tables - otherwise our change will not be applied for the pages already stored in the TLB.
+`set_pgd`関数を見ると`ttbr0_el1`をセットした後、[TLB](https://en.wikipedia.org/wiki/Translation_lookaside_buffer)
+ (Translation lookaside buffer)をクリアしていることがわかります。
+TLBは、物理ページと仮想ページのマッピングを保存するために特別に設計
+されたキャッシュです。ある仮想アドレスが初めて物理アドレスにマッピング
+された際にこのマッピングはTLBに格納されます。これにより、次回、同じ
+ページにアクセスする際にはページテーブルウォークを行う必要がなくなり
+ます。そのため、ページテーブルを更新した後にTLBを無効にするのはまったく
+理にかなっています。そうしないと、TLBにすでに格納されているページには
+変更が適用されません。
 
-Usually, we try to avoid using all caches for simplicity, but without TLB any memory access would become extremely inefficient, and I don't think that it is even possible to completely disable TLB. Besides, TLB doesn't add any other complexity to the OS, in spite of the fact that we must clean it after switching `ttbr0_el1`.
+通常、私たちは単純化のためにキャッシュの使用はすべて避けていますが、
+TLBなしではあらゆるメモリアクセスが極めて非効率的になりますし、TLBを
+完全に無効にできるとは思えません。それに、`ttbr0_el1`の切り替え後に
+クリアしなければならないこと以外は、TLBはOSに複雑さを加えることは
+ありません。
 
-### Mapping a virtual page
+### 仮想ページをマッピングする
 
-We have seen previously how [allocate_user_page](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L14) function is used - now it is time to see what is inside it.
+We have seen previously how [allocate_user_page](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L14)
+関数がどのように使用されるかについては既に見てきました。次は、その
+内部がどの様になっているかを見ていく番です。
 
 ```
 unsigned long allocate_user_page(struct task_struct *task, unsigned long va) {
@@ -467,7 +709,18 @@ unsigned long allocate_user_page(struct task_struct *task, unsigned long va) {
 }
 ```
 
-This function allocates a new page, maps it to the provided virtual address and returns a pointer to the page. When we say "a pointer" now we need to distinguish between 3 things: a pointer to a physical page, a pointer inside kernel address space and a pointer inside user address space - all these 3 different pointers can lead to the same location in memory. In our case `page` variable is a physical pointer and the return value is a pointer inside kernel address space. This pointer can be easily calculated because we linearly map the whole physical memory starting at `VA_START` virtual address. We also don't need to worry about allocating new kernel page table because all of the memory is already mapped in `boot.S`. User mapping is still required to be created and this happens in the [map_page](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L62) function, which we will explore next.
+この関数は新しいページを割り当て、指定された仮想アドレスにマッピングし。
+そのページへのポインタを返します。これからは「ポインタ」と言う場合には
+3つのポインタを区別する必要があります。物理ページへのポインタと
+カーネルアドレス空間のポインタ、ユーザアドレス空間のポインタです。
+これら3つの異なるポインタはすべてメモリ内の同じ場所に導くことができます。
+この例では`page`変数は物理ポインタであり、返り値はカーネルアドレス
+空間のポインタです。このポインタは観点に計算することができます。
+物理メモリ全体を`VA_START`仮想アドレスを起点にしてリニアにマッピング
+しているからです。また、新しいカーネルページテーブルの割り当てに関しても
+心配する必要はありません。`boot.S`ですべてのメモリがマッピングされて
+いるらです。ユーザマッピングは依然として作成する必要があり、これは
+次に説明する[map_page](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L62)関数で行われます。
 
 ```
 void map_page(struct task_struct *task, unsigned long va, unsigned long page){
@@ -496,11 +749,17 @@ void map_page(struct task_struct *task, unsigned long va, unsigned long page){
 }
 ```
 
-`map_page` in some way duplicates what we've been doing in the `__create_page_tables` function: it allocates and populates a page table hierarchy. There are 3 important difference, however: now we are doing this in C, instead of assembler. `map_page` maps a single page, instead of the whole memory, and use normal page mapping, instead of section mapping.
+`map_page`は、`__create_page_tables`関数で行っていることとある意味で
+重複しています。この関数はページテーブル階層を割り当て、生成します。
+ただし、重要な違いが3点あります。コードはアセンブラではなくCで
+書かれている点、`map_page`はメモリ全体ではなく単一のページを
+マッピングする点、セクションマッピングではなく通常のページマッピングを
+使用する点です。
 
-There are 2 important functions involved in the process:  [map_table](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L47) and [map_table_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L40).
+このプロセスには[map_table](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L47)と
+[map_table_entry](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L40)という2つの重要な関数が関係します。
 
-`map_table` is listed below.
+`map_table`を以下に示します。
 
 ```
 unsigned long map_table(unsigned long *table, unsigned long shift, unsigned long va, int* new_table) {
@@ -519,16 +778,29 @@ unsigned long map_table(unsigned long *table, unsigned long shift, unsigned long
 }
 ```
 
-This function has the following arguments.
+この関数は次の引数を取ります。
 
-* `table` This is a pointer to the parent page table. This page table is assumed to be already allocated, but might be empty.
-* `shift` This argument is used to extract table index from the provided virtual address.
-* `va` Virtual address itself.
-* `new_table` This is an output parameter. It is set to 1 if a new child table has been allocated and left 0 otherwise.
+* `table` これは親ページテーブルへのポインタです。このページテーブルは
+割り当て済みであると仮定されますが、空の場合もあります。
+* `shift` この引数は指定された仮想アドレスからテーブルインデックスを
+抽出するために使用されます。
+* `va` 仮想アドレスそのものです。
+* `new_table` これは出力パラメタです。新規子テーブルが割り当てられた
+場合は1がセットされます。それ以外は0のままです。
 
-You can think of this function as an analog of the `create_table_entry` macro. It extracts table index from the virtual address and prepares a descriptor in the parent table that points to the child table. Unlike `create_table_entry` macro we don't assume that the child table should be adjacent into memory with the parent table - instead, we rely on `get_free_table` function to return whatever page is available. It also might be the case that child table was already allocated (This might happen if child page table covers the region where another page has been allocated previously.). In this case we set `new_table` to 0 and read child page table address from the parent table.
+この関数は`create_table_entry`マクロに相当するものだと考えることが
+できます。この関数は仮想アドレスからテーブルインデックスを抽出し、
+子テーブルを指す親テーブル内の記述子を準備します。`create_table_entry`
+マクロとは異なり、子テーブルがメモリ上親テーブルに隣接しているとは
+想定しません。その代わり、利用可能なページを返す`get_free_table`関数に
+依存します。また、子テーブルが割り当て済みの場合もあります（子ページ
+テーブルが以前別のページに割り当てられていた領域をカバーする場合などに
+起こります）。この場合は`new_table`を0に設定し、親テーブルから子ページ
+テーブルのアドレスを読み込みます。
 
-`map_page` calls `map_table` 3 times: once for PGD, PUD and PMD. The last call allocates PTE and sets a descriptor in the PMD. Next, `map_table_entry` is called. You can see this function below.
+`map_page`は`map_table`を3回呼び出します。PGD、PUD、PMDに対して1回ずつ
+です。最後の呼び出しはPTEを割り当て、PMDに記述子を設定します。次に、
+`map_table_entry`が呼び出されます。この関数を以下に示します。
 
 ```
 void map_table_entry(unsigned long *pte, unsigned long va, unsigned long pa) {
@@ -539,13 +811,28 @@ void map_table_entry(unsigned long *pte, unsigned long va, unsigned long pa) {
 }
 ```
 
-`map_table_entry` extracts PTE index from the virtual address and then prepares and sets PTE descriptor. It is similar to what we've been doing in the `create_block_map` macro.
+`map_table_entry`は仮想アドレスからPTEインデックスを抽出し、PTE記述子
+の準備と設定を行います。これは`create_block_map`マクロで行っていることと
+同様です。
 
-That's it about user page tables allocation, but `map_page` is responsible for one more important role: it keeps track of the pages that have been allocated during the process of virtual address mapping. All such pages are stored in the [kernel_pages](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/sched.h#L53) array. We need this array to be able to clean up allocated pages after a task exits. There is also [user_pages](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/sched.h#L51) array, which is also populated by the `map_page` function. This array store information about the correspondence between process virtual pages any physical pages. We need this information in order to be able to copy process virtual memory during `fork` (More on this later).
+ユーザページテーブルの割り当てについては以上ですが、`map_page`には
+もう秘湯重要な役割があります。それは仮想アドレスマッピングの過程で
+割り当てられたページを追跡することです。そのようなページはすべて
+[kernel_pages](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/sched.h#L53)
+配列に格納されます。この配列はタスクの終了後に割り当てられたページを
+開放できるようにするために必要です。また、[user_pages](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/include/sched.h#L51)
+配列もあり、これも`map_page`関数によってデータが追加されます。この配列
+には、プロセスの仮想ページと物理ページとの対応関係に関する情報が格納
+されます。この情報は`fork`時にプロセスの仮想メモリをコピーするために
+必要です（詳細は後述します）。
 
-### Forking a process
+### プロセスをフォークする
 
-Before we move forward let me summarize where we are so far: we've seen how first user process is created, its page tables populated, source code copied to the proper location and stack initialized. After all of this preparation, the process is ready to run. The code that is executed inside user process is listed below.
+先に進む前に、これまでの流れをまとめておきましょう。私たちはどのように
+最初のユーザプロセスが作成され、そのページテーブルにデータが追加され、
+ソースコードが適切な場所にコピーされ、スタックが初期化されるかを見て
+きました。これらの準備を経て、プロセスは実行可能な状態になります。
+ユーザプロセス内で実行されるコードを以下に示します。
 
 ```
 void loop(char* str)
@@ -577,9 +864,20 @@ void user_process()
 }
 ```
 
-The code itself is very simple. The only tricky part is the semantics of the `fork` system call. Unlike `clone`, when doing `fork` we don't need to provide the function that needs to be executed in a new process. Also, the [fork wrapper function](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/user_sys.S#L26) is much easier than the `clone` one. All of this is possible because of the fact that `fork` make a full copy of the process virtual address space, so the fork wrapper function return twice: one time in the original process and one time in the new one. At this point, we have two identical processes, with identical stacks and `pc` positions. The only difference is the return value of the `fork` syscall: it returns child PID in the parent process and 0 in the child process. Starting from this point both processes begin completely independent life and can modify their stacks and write different things using same addresses in memory - all of this without affecting one another.
+コード自体はとてもシンプルです。唯一厄介なのは`fork`システムコールの
+セマンティクスです。`clone`とは異なり、`fork`を行う際には、新しい
+プロセスで実行する必要のある関数を提供する必要はありません。また、
+[forkラッパー関数](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/user_sys.S#L26)は
+`clone`のものよりずっと簡単です。これらのことが可能なのは、`fork`は
+プロセスの仮想アドレス空間の完全なコピーを作成するためです。そのため、
+forkラッパー関数は2回返ります。1回は元のプロセスで、もう1回は新しいプロセスです。この時点で、同じスタックと`pc`を持つ2つの同じプロセスが存在する
+ことになります。唯一の違いは`fork`システムコールの返り値です。親プロセス
+では子のPIDを、子プロセスでは0を返します。この時点から両プロセスは完全に
+独立に実行され、スタックを変更したり、メモリ上の同じアドレスに異なる
+内容を書き込んだりすることができます。
 
-Now let's see how `fork` system call is implemented. [copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/fork.c#L7) function does most of the job.
+それでは`fork`システムコールがどのように実装されているか見てみましょう。
+[copy_process](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/fork.c#L7)関数がほとんどの仕事をしています。
 
 ```
 int copy_process(unsigned long clone_flags, unsigned long fn, unsigned long arg)
@@ -601,7 +899,7 @@ int copy_process(unsigned long clone_flags, unsigned long fn, unsigned long arg)
         struct pt_regs * cur_regs = task_pt_regs(current);
         *childregs = *cur_regs;
         childregs->regs[0] = 0;
-        copy_virt_memory(p);
+        copy_virt_memory(p);        // この行に注目
     }
     p->flags = clone_flags;
     p->priority = current->priority;
@@ -619,7 +917,10 @@ int copy_process(unsigned long clone_flags, unsigned long fn, unsigned long arg)
 }
 ```
 
-This function looks almost exactly the same as in the previous lesson with one exception: when copying user processes, now, instead of modifying new process stack pointer and program counter, we instead call [copy_virt_memory](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L87). `copy_virt_memory` looks like this.
+この関数は前回のレッスンとほとんど同じですが、1つだけ違いがあります。
+ユーザプロセスをコピーする際には、新規プロセスのスタックポインタと
+プログラムカウンタを変更する代わりに[copy_virt_memory](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L87)
+を呼び出しています。`copy_virt_memory`のコードは次のようなものです。
 
 ```
 int copy_virt_memory(struct task_struct *dst) {
@@ -635,15 +936,33 @@ int copy_virt_memory(struct task_struct *dst) {
 }
 ```
 
-It iterates over `user_pages` array, which contains all pages, allocated by the current process. Note, that in `user_pages` array we store only pages that are actually available to the process and contain its source code or data; we don't include here page table pages, which are stored in `kernel_pages` array. Next, for each page, we allocate another empty page and copy the original page content there. We also map the new page using the same virtual address, that is used by the original one. This is how we get the exact copy of the original process address space.
+これは、カレントプロセスによって割り当てられたすべてのページを含む
+`user_pages`配列にわたり繰り返し処理します。`user_pages`配列には
+そのプロセスが実際に利用可能で、そのソースコードかデータを含む
+ページのみが格納されていることに注意してください。ここには`kernel_pages`
+配列に格納されているページテーブルページは含まれていません。次に、
+各ページについて別の空ページを割り当てて元のページの内容をコピー
+します。また、元のページで使用されていた同じ仮想アドレスを使って
+新しいページをマッピングします。このようにして、元のプロセスの
+アドレス空間の正確なコピーを取得します。
 
-All other details of the forking procedure work exactly in the same way, as they have been in the previous lesson.
+フォーク手順のその他の詳細は前回のレッスンのものとまったく同じように
+動作します。
 
-### Allocating new pages on demand
+### 新しいページをオンデマンドで割り当てる
 
-If you go back and take a look at the `move_to_user_mode` function, you may notice that we only map a single page, starting at offset 0. But we also assume that the second page will be used as a stack. Why don't we map the second page as well? If you think it is a bug, it is not - it is a feature! Stack page, as well as any other page that a process needs to access will be mapped as soon as it will be requested for the first time. Now we are going to explore the inner-workings of this mechanism.
+`move_to_user_mode`関数に戻って見てみると、オフセット0から始まる
+1ページしかマッピングしていないことに気づくでしょう。しかし、
+2ページ目がスタックとして使用されることが想定されます。なぜ、2ページ目も
+マッピングしないのでしょうか。バグだと思うでしょう。しかし、バグでは
+ありません。機能なのです。スタックページだけでなく、プロセスがアクセス
+する必要のある他のページも初めて要求された時に初めてマッピングされます。
+ここからはこのメカニズムの内部構造を見ていきましょう。
 
-When a process tries to access some address which belongs to the page that is not yet mapped a synchronous exception is generated. This is the second type of synchronous exception that we are going to support (the first type is an exception generated by the `svc` instruction which is a system call). Synchronous exception handler now looks like the following.
+プロセスがまだマッピングされていないページに属するアドレスにアクセス
+しようとすると同期例外が発生します。これは私たちがサポートする2つ目の
+タイプの同期例外です（1つ目のタイプはシステムコールである`svc``命令に
+よって発生する例外です）。同期例外ハンドラは次のようになっています。
 
 ```
 el0_sync:
@@ -657,7 +976,9 @@ el0_sync:
     handle_invalid_entry 0, SYNC_ERROR
 ```
 
-Here we use `esr_el1` register to determine exception type. If it is a page fault exception (or, which is the same, data access exception) `el0_da` function is called.
+ここでは`esr_el1`レジスタを使用して例外の種類を判断しています。
+ページフォルト例外（あるいは、同じですが、データアクセス例外）の場合は、
+`el0_da`関数が呼び出されます。
 
 ```
 el0_da:
@@ -673,12 +994,14 @@ el0_da:
     kernel_exit 0
 ```
 
-`el0_da` redirects the main work to the [do_mem_abort](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L101) function. This function takes two arguments
-1. The memory address which we tried to access. This address is taken from `far_el1`  register (Fault address register)
-1. The content of the `esr_el1` (Exception syndrome register)
+`el0_da`は主な作業を[do_mem_abort](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson06/src/mm.c#L101)
+関数にリダイレクトします。この関数は2つの引数を取ります。
 
-`do_mem_abort` is listed below.
+1. アクセスしようとしたメモリアドレス。このアドレスは`far_el1`レジスタ
+（フォールトアドレスレジスタ）から取得します。
+2. `esr_el1`(例外シンドロームレジスタ)の内容。
 
+`do_mem_abort`のコードは次のとおりです。
 ```
 int do_mem_abort(unsigned long addr, unsigned long esr) {
     unsigned long dfs = (esr & 0b111111);
@@ -698,18 +1021,41 @@ int do_mem_abort(unsigned long addr, unsigned long esr) {
 }
 ```
 
-In order to understand this function, you need to know a little bit about the specifics of that `esr_el1` register. Bits [32:26] of this register are called "Exception Class". We check those bits in the `el0_sync` handler to determine whether it is a syscall, or a data abort exception or potentially something else. Exception class determines the meaning of bits [24:0] - those bits are usually used to provide additional information about the exception. The meaning of [24:0] bits in case of the data abort exception is described on the page 2460 of the `AArch64-Reference-Manual`. In general, data abort exception can happen in many different scenarios (it could be a permission fault, or address size fault or a lot of other things). We are only interested in a translation fault which happens when some of the page tables for the current virtual address are not initialized.
-So in the first 2 lines of the `do_mem_abort` function, we check whether the current exception is actually a translation fault. If yes we allocate a new page and map it to the requested virtual address. All of this happens completely transparent for the user program - it doesn't notice that some of the memory accesses were interrupted and new page tables were allocated in the meantime.
+この機能を理解するためには`esr_el1`レジスタの仕様について少し知って
+おく必要があります。このレジスタの[32:26]ビットは「例外クラス」と
+呼ばれています。`el0_sync`ハンドラはこれらのビットをチェックして、
+それがシスコールなのか、データアボート例外なのか、あるいは潜在的な
+何か他のものなのかを判断します。例外クラスは[24:0]ビットの意味を
+決定します。これらのビットは通常、例外に関する追加情報を提供する
+ために使用されます。データアボート例外の場合の[24:0]ビットの意味は
+`AArch64-Reference-Manual`の2460ページに記載されています。一般に、
+データアボート例外はさまざまなシナリオで発生する可能性があります
+（パーミッションフォールト、アドレスサイズフォールト、その他多くの
+可能性があります）。ここでは、現在の仮想アドレスに対応するページ
+テーブルの一部が初期化されていない場合に発生する変換フォールトにのみ
+関心があります。そこで、`do_mem_abort`関数の最初の2行で、現在の例外が
+実際に変換フォールトであるかチェックしています。もしそうであれば、
+新しいページを割り当てて、要求された仮想アドレスにマッピングします。
+これらの処理はユーザプログラムからは完全に透過的に行われます。ユーザ
+プログラムは、一部のメモリアクセスが中断され、その間に新しいページ
+テーブルが割り当てられたことには気付きません。
 
-### Conclusion
+### 結論
 
-This was a long and difficult chapter, but I hope it was useful as well. Virtual memory is really one of the most fundamental pieces of any operating system and I am glad we've passed through this chapter and, hopefully, started to understand how it works at the lowest level. With the introduction of virtual memory we now have full process isolation, but the RPi OS is still far from completion. It still doesn't support file systems, drivers, signals and interrupt waitlists, networking and a lot of other useful concepts, and we will continue to uncover them in the upcoming lessons.
+この章は長くて難しいものでしたが、お役に立てれば幸いです。仮想メモリは
+オペレーティングシステムの最も基本的な要素の1つです。この章を通して、
+願わくば、仮想メモリが最も低いレベルでどのように動作しているかを理解し
+始めたことを嬉しく思います。仮想メモリの導入により、プロセスの完全な
+隔離が可能になりましたが、RPiのOSはまだ完成にはほど遠い状態です。
+ファイルシステム、ドライバ、シグナルと割込み待ちリスト、ネットワーク、
+その他多くの有用な概念がまだサポートされていません。今後のレッスンで
+それらを引き続き明らかにしていきます。
 
-##### Previous Page
+##### 前ページ
 
-5.3 [User processes and system calls: Exercises](../../ja/lesson05/exercises.md)
+5.3 [ユーザプロセスとシステムコール: 演習](../../ja/lesson05/exercises.md)
 
-##### Next Page
+##### 次ページ
 
-6.2 Virtual memory management: Linux (in progress)
-6.3 jump forward to [Virtual memory management: Exercises](../../ja/lesson06/exercises.md)
+6.2 仮想メモリ管理: Linux (準備中)
+6.3 [仮想メモリ管理: 演習](../../ja/lesson06/exercises.md)にジャンプ
