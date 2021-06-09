@@ -70,10 +70,10 @@ OS開発のスキルは必要ありません。
   * 5.1 [RPi OS](translations/ja/lesson05/rpi-os.md)
   * 5.2 [Linux](translations/ja/lesson05/linux.md)
   * 5.3 [演習](translations/ja/lesson05/exercises.md)
-* **Lesson 6: Virtual memory management**
+* **Lesson 6: 仮想メモリ管理**
   * 6.1 [RPi OS](translations/ja/lesson06/rpi-os.md)
-  * 6.2 Linux (In progress)
-  * 6.3 [Exercises](translations/ja/lesson06/exercises.md)
+  * 6.2 Linux (準備中)
+  * 6.3 [演習](translations/ja/lesson06/exercises.md)
 * **Lesson 7: Signals and interrupt waiting** (To be done)
 * **Lesson 8: File systems** (To be done)
 * **Lesson 9: Executable files (ELF)** (To be done)

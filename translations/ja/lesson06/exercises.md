@@ -1,12 +1,12 @@
-## 6.3 Exercises
+## 6.3 演習
 
-1. Adapt lesson 06 to run on qemu. You have to implement [identity mapping](https://wiki.osdev.org/Identity_Paging) in order to do this. Check [this](https://github.com/s-matyukevich/raspberry-pi-os/issues/8) issue for reference.
+1. レッスン06をqemu上で実行できるようにしてください。[このissue](https://github.com/s-matyukevich/raspberry-pi-os/issues/8)を参考にしてください。
 
-##### Previous Page
+##### 前ページ
 
-6.2 Virtual memory management: Linux (in progress)
-6.1 jump backward to [Virtual memory management: RPi OS](../../ja/lesson06/rpi-os.md)
+6.2 仮想メモリ管理: Linux (準備中)
+6.1 [仮想メモリ管理: RPi OS](../../ja/lesson06/rpi-os.md)にジャンプバック
 
-##### Next Page
+##### 次ページ
 
-7.1 Signals and interrupt waiting: RPi OS (to be done)
+7.1 シグナルと割り込み待機: RPi OS (未完)
