@@ -2,30 +2,30 @@
 
 Linuxカーネルの構成を調べた後は、それをどのようにビルド・実行するかを調べる
 ことに時間をかける価値があります。Linuxもカーネルのビルドには`make`
-ユーティリティを使用しますが、Linuxのmakefileははるかに複雑です。makefileを
-見る前にLinuxのビルドシステムに関するいくつかの重要な概念を学びましょう。
-それは"kbuild"と呼ばれています。
+ユーティリティを使用しますが、LinuxのmakefileはRPi OSよりはるかに複雑です。
+makefileを見る前にLinuxのビルドシステムに関するいくつかの重要な概念を学びましょう。
+それは`kbuild`と呼ばれるものです。
 
-### kbuildの重要なコンセプト
+### kbuildの重要な概念
 
 * ビルドプロセスはkbuild変数を使ってカスタマイズすることができます。
   これらの変数は`Kconfig`ファイルで定義されます。このファイルでは変数自体と
-  そのデフォルト値を定義することができます。変数には、文字列、真偽値、
+  そのデフォルト値を定義することができます。変数は、文字列、真偽値、
   整数など、さまざまな型を持つことができます。Kconfigファイルでは、変数間の
-  依存関係を定義することもできます（たとえば、変数Xが選択されたら、変数Yが
+  依存関係を定義することもできます（たとえば、変数Xが選択されたら、変数Yも
   暗黙のうちに選択されるようにすることができます）。例として、[arm64のKconfigファイル](https://github.com/torvalds/linux/tree/v4.14/arch/arm64/Kconfig)を
   見てみましょう。このファイルには`arm64`アーキテクチャ固有のすべての変数が
   定義されています。`Kconfig`の機能は標準的な`make`の機能ではなく、Linuxの
-  makefileに実装されているものです。`Kconfig`で定義された変数はカーネルの
+  makefileに実装されているものです。`Kconfig`で定義された変数はカーネル
   ソースコードだけでなく、ネストされたmakefileにも公開されます。変数の値は
-  カーネルの構成段階で設定することができます。（たとえば、`make menuconfig`と
+  カーネルの構成時に設定することができます。（たとえば、`make menuconfig`と
   入力すると、コンソールGUIが表示されます。これを使うことにより、すべての
   カーネル変数の値をカスタマイズすることができ、その値は`.config`に保存
   されます。カーネルの構成に使用できるすべてのオプションを表示するには
   `make help`コマンドを使用してください。)
 
-* Linuxは再帰的ビルドを採用しています。これはLinuxカーネルはサブフォルダ
-  ごとにが独自の`Makefile`と`Kconfig`を定義できることを意味します。ネスト
+* Linuxは再帰的ビルドを採用しています。これはLinuxカーネルはサブディレクトリ
+  ごとに独自の`Makefile`と`Kconfig`を定義できることを意味します。ネスト
   されたMakefileのほとんどは非常にシンプルであり、どのオブジェクトファイルを
   コンパイルする必要があるかを定義しているだけです。通常、このような定義は
   次のような形式になっています。
@@ -46,7 +46,7 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   ネストしたMakefileの例は[この`Makefile`](https://github.com/torvalds/linux/tree/v4.14/kernel/Makefile)にあります。
 
 * 先に進む前に、基本的なmakeルールの構造を理解し、make用語に慣れておく
-  必要があります。一般的なルールの構造を以下に図示します。
+  必要があります。一般的なルールの構造を以下に示します。
 
   ```
   targets : prerequisites
@@ -90,12 +90,12 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   呼び出して対応する`.o`ファイルをビルドします。`if_changed`は（最初の引数に
   `cmd_`というプレフィックスを追加した）`cmd_compile`変数を探し、この変数が
   前回の実行後に更新されていないか、また、前提条件が変更されていないかを
-  チェックします。変更されている場合、`cmd_compile`コマンドが実行され
-  オブジェクトファイルが再生成されます。このサンプルルールでは、2つの前提
+  チェックします。変更されている場合、`cmd_compile`コマンドを実行し
+  オブジェクトファイルを再生成します。このサンプルルールでは、2つの前提
   条件があります。ソースファイル`.c`と`FORCE`です。`FORCE`は特別な前提条件で
-  あり、`make`コマンドが呼び出されるたびにレシピが強制的に呼び出されます。
+  あり、`make`コマンドが呼び出されるたびにレシピを強制的に呼び出します。
   これがないと、`.c`ファイルが変更された場合にしかレシピが呼び出されません。
-  `FORCE`ターゲットの詳細については[こちら](https://www.gnu.org/software/make/manual/html_node/Force-Targets.html)をご覧ください。
+  `FORCE`ターゲットの詳細については[公式ドキュメント](https://www.gnu.org/software/make/manual/html_node/Force-Targets.html)をご覧ください。
 
 ### カーネルのビルド
 
@@ -111,8 +111,8 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
 
 #### リンクステージ
 
-* `make help`コマンドの出力を見るとわかるかもしれませんが、カーネルのビルドを
-  担当するデフォルトのターゲットは`vmlinux`と呼ばれています。
+* `make help`コマンドの出力を見るとわかると思いますが、カーネルのビルドを
+  担当するデフォルトのターゲットは`vmlinux`です。
 
 * `vmlinux`ターゲットの定義は[`Makefile#L1004`](https://github.com/torvalds/linux/blob/v4.14/Makefile#L1004)にあり、次のようになっています。
 
@@ -131,11 +131,11 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   スクリプトを実行します（`cmd_link-vmlinux`コマンドで自動変数 [$<](https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html)
   が使用されていることに注意してください）。また、アーキテクチャ固有の
   [postlink script](https://github.com/torvalds/linux/blob/v4.14/Documentation/kbuild/makefiles.txt#L1229)
-  スクリプトも実行されますが、ここではあまり興味がありません。
+  スクリプトも実行されますが、私たちにはあまり興味はありません。
 
 * [scripts/link-vmlinux.sh](https://github.com/torvalds/linux/blob/v4.14/scripts/link-vmlinux.sh)が実行される際、必要なすべてのオブジェクトファイルは
 既にビルドされており、そのロケーションが3つの変数、`KBUILD_VMLINUX_INIT`,
-`KBUILD_VMLINUX_MAIN`, `KBUILD_VMLINUX_LIBS`に格納されていると仮定されています。
+`KBUILD_VMLINUX_MAIN`, `KBUILD_VMLINUX_LIBS`に格納されていると仮定しています。
 
 * `link-vmlinux.sh`スクリプトはまず、利用可能なすべてのオブジェクトファイル
 から`thin archive`を作成します。`thin archive`はオブジェクトファイルセット
@@ -168,7 +168,7 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
 ファイルであり、`/proc/kallsyms`とは異なり、実行時には生成されません。
 `System.map`は主に[kernel oops](https://en.wikipedia.org/wiki/Linux_kernel_oops)
 でアドレスをシンボル名に解決するために使用されます。`System.map`の作成には
-同じ`nm`ユーティリティが使用されます。これは[`mksysmap#L44`](https://github.com/torvalds/linux/blob/v4.14/scripts/mksysmap#L44)で行われています。
+同じく`nm`ユーティリティが使用されます。これは[`mksysmap#L44`](https://github.com/torvalds/linux/blob/v4.14/scripts/mksysmap#L44)で行われています。
 
 #### ビルドステージ
 
@@ -199,14 +199,14 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN) $(KBUILD_VMLINUX_LIBS)
   ```
 
-  それはすべて`init-y`、`core-y`などの変数から始まります。これらの組み合わせは
-  ビルド可能なソースコードを含むLinuxカーネルのすべてのサブフォルダを含んで
-  います。次に、すべてのサブフォルダ名に`built-in.o`が追加され、たとえば、
+  すべては`init-y`、`core-y`などの変数から始まります。これらの組み合わせは
+  ビルド可能なソースコードを含むLinuxカーネルのすべてのサブディレクトリを含みます。
+  次に、すべてのサブディレクトリ名に`built-in.o`が追加され、たとえば、
   `drivers/`は`drivers/built-in.o`になります。`vmlinux-deps`は結果として
-  得られたすべての値を集約します。これで`vmlinux`が最終的にすべての
+  得られたすべての値を集約しています。これで`vmlinux`が最終的にすべての
   `built-in.o`ファイルに依存するようになることが説明できます。
 
-* 次の疑問は、すべての`builtin.o`オブジェクトがどのように作られるかです。
+* 次の疑問は、すべての`builtin.o`オブジェクトがどのように作られているかです。
 もう一度、関連するすべての行をコピーして、すべての仕組みを説明しましょう。
 
   ```
@@ -223,12 +223,12 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
 
   ```
 
-  最初の行から`vmlinux-deps`は`vmlinux-dirs@に依存していることがわかります。
-  次に、`vmlinux-dirs`は最後に`/`文字がない、すべてのダイレクトルート
-  サブフォルダを含む変数であることがわかります。そして、ここで最も重要な行は
+  最初の行から`vmlinux-deps`は`vmlinux-dirs`に依存していることがわかります。
+  次に、`vmlinux-dirs`は最後の`/`文字を取った、ルート直下のすべての
+  サブディレクトリを含む変数であることがわかります。そして、ここで最も重要な行は
   `$(vmlinux-dirs)`ターゲットを構築するためのレシピです。すべての変数を
-  置換した後にこのレシピは次のようになります（例として`driver`フォルダを
-  使用していますが、このルールはすべてのルートサブフォルダに対して実行
+  置換した後にこのレシピは次のようになります（例として`driver`ディレクトリを
+  使用していますが、このルールはすべてのルートサブディレクトリに対して実行
   されます）。
 
   ```
@@ -236,12 +236,12 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   ```
 
   この行は別のmakefile（[scripts/Makefile.build](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build)）を
-  呼び出して、コンパイルするフォルダを含む`obj`変数を渡しているだけです。
+  呼び出して、コンパイルするディレクトリを含む`obj`変数を渡しているだけです。
 
-* 次の論理的ステップは[scripts/Makefile.build](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build)を見てみましょう。これの実行後に起きる
-最初に重要なことは、カレントディレクトリで定義されている`Makefile`または
-`Kbuild`ファイルのすべての変数が含まれることです。カレントディレクトリとは
-`obj`変数により参照されるディレクトリを意味します。この包摂は[`Makefile.build#L43-L45`の三行](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L43-L45)で行われています。
+* 次の論理的ステップとして、[scripts/Makefile.build](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build)を見てみましょう。これの実行後に起きる
+第一に重要なことは、カレントディレクトリで定義されている`Makefile`または
+`Kbuild`ファイルのすべての変数がインクルードされることです。カレントディレクトリとは
+`obj`変数により参照されるディレクトリを意味します。このインクルードは[`Makefile.build#L43-L45`の三行](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L43-L45)で行われています。
 
   ```
   kbuild-dir := $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))
@@ -249,16 +249,17 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   include $(kbuild-file)
   ```
 
-  ネストされた`makefile`はほとんどが`obj-y`のような変数の初期化を担当します。
-  簡単に思い出すと、`obj-y`変数にはカレントディレクトリにあるすべてのソース
-  コードファイルのリストが入っているはずです。入れ子のmakefileで初期化される
-  もう  一つ重要な変数は`subdir-y`です。この変数にはカレントディレクトリにある
-  ソースコードをビルドする前に訪れる必要のあるすべてのサブフォルダのリストが
-  含まれています。`subdir-y`はサブフォルダへの再帰的な降下を実装するために
+  ネストされる`makefile`のほとんどは`obj-y`などの変数の初期化を担当します。
+  念のために言うと`obj-y`変数にはカレントディレクトリにあるすべてのソース
+  コードファイルのリストが入っているはずです。ネストしたmakefileで初期化される
+  もう1つ重要な変数は`subdir-y`です。この変数にはカレントディレクトリにある
+  ソースコードをビルドする前に訪れる必要のあるすべてのサブディレクトリのリストが
+  含まれています。`subdir-y`はサブディレクトリへの再帰的降下を実装するために
   使用されます。
 
 * ターゲットを指定せずに`make`が呼び出された場合（`scripts/Makefile.build`が
-実行された場合がそうです）は最初のターゲットが使用されます。`scripts/Makefile.build`の最初のターゲットは`__build`と呼ばれ、[`Makefile.build#L96`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L96)に
+実行された場合がそうです）は最初のターゲットが使用されます。`scripts/Makefile.build`の
+最初のターゲットは`__build`であり、[`Makefile.build#L96`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L96)に
 あります。それでは見てみましょう。
 
   ```
@@ -274,8 +275,8 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   する`$(subdir-ym)` だけです。
 
 * `subdir-ym`を見てみましょう。この変数は[`Makefile.lib#L48`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.lib#L48)で
-初期化されており、変数`subdir-y`と`subdir-m`を連結しただけです（`subdir-m`
-変数は`subdir-y`と似ていますが、個別の[カーネルモジュール](https://en.wikipedia.org/wiki/Loadable_kernel_module)に含まれる必要のあるサブフォルダを定義します。
+初期化されており、変数`subdir-y`と`subdir-m`を連結しているだけです（`subdir-m`
+変数は`subdir-y`と似ていますが、個別の[カーネルモジュール](https://en.wikipedia.org/wiki/Loadable_kernel_module)に含める必要のあるサブディレクトリを定義します。
 今のところ、集中力を保つためにモジュールの議論は省略します）。
 
 *  `subdir-ym`ターゲットは[`Makefile.build#L572`](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L572)で
@@ -286,12 +287,11 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
       $(Q)$(MAKE) $(build)=$@
   ```
 
-  このターゲットはネストされたサブフォルダの一つにある`scripts/Makefile.build`
-  の実行をトリガーするだけです。
+  このターゲットはネストされたサブディレクトリの1つにある`scripts/Makefile.build`
+  の実行をトリガするだけです。
 
 * ようやく[builtin-target](https://github.com/torvalds/linux/blob/v4.14/scripts/Makefile.build#L467)
-ターゲットを検証する時になりました。もう一度言いますが、ここでは関連する行
-だけをコピーしています。
+ターゲットを検証する時が来ました。もう一度言いますが、ここでは関連する行だけをコピーしています。
 
   ```
   cmd_make_builtin = rm -f $@; $(AR) rcSTP$(KBUILD_ARFLAGS)
@@ -307,7 +307,7 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   ```
 
   このターゲットは`$(obj-y)`ターゲットに依存しており、`obj-y`は現在の
-  カレントフォルダでビルドする必要のあるすべてのオブジェクトファイルのリスト
+  カレントディレクトリでビルドする必要のあるすべてのオブジェクトファイルのリスト
   です。そのようなファイルの準備ができたら`cmd_link_o_target`コマンドが実行
   されます。`obj-y`変数が空の場合は`cmd_make_empty_builtin`が呼び出され、
   空の`built-in.o`が作成されます。そうでない場合は`cmd_make_builtin`コマンドが
@@ -340,17 +340,15 @@ Linuxカーネルの構成を調べた後は、それをどのようにビルド
   このターゲットはそのレシピで`rule_cc_o_c`を呼び出します。このルールは
   たくさんのことを担当します。たとえば、一般的なエラーがないかソースコードを
   チェック (`cmd_checksrc`)、エクスポートされたモジュールシンボルの
-  バージョニングの有効化 (`cmd_modversions_c`)、[objtool](https://github.com/torvalds/linux/tree/v4.14/tools/objtool)を使用した生成されたオブジェクト
-  ファイルの検証、[ftrace](https://github.com/torvalds/linux/blob/v4.14/Documentation/trace/ftrace.txt)の迅速な検索を可能にする`mcount`関数の
-  呼び出しリストの作成などです。しかし、最も重要なのは実際にすべての
-  `.c`ファイルをオブジェクトファイルにコンパイルする`cmd_cc_o_c`コマンドの
-  呼び出しです。
+  バージョニングを有効化 (`cmd_modversions_c`)、[objtool](https://github.com/torvalds/linux/tree/v4.14/tools/objtool)を使用して生成されたオブジェクトファイルを検証、[ftrace](https://github.com/torvalds/linux/blob/v4.14/Documentation/trace/ftrace.txt)の迅速な検索を可能にする`mcount`関数の
+  呼び出しリストを作成などです。しかし、最も重要なことは実際にすべての`.c`ファイルをオブジェクト
+  ファイルにコンパイルする`cmd_cc_o_c`コマンドの呼び出しです。
 
 ### 結論
 
-カーネルビルドシステムの内部についての長い旅でした。それでも多くの詳細を
-省略しました。この主題についてもっと詳しく知りたい方は、[このドキュメント](https://github.com/torvalds/linux/blob/v4.14/Documentation/kbuild/makefiles.txt)を
-読み、Makefilesのソースコードを読み続けることをお勧めします。ここでは
+カーネルビルドシステムの内部についての長い旅でした。これでも多くの詳細を
+省略しています。この主題についてもっと詳しく知りたい方は、[このドキュメント](https://github.com/torvalds/linux/blob/v4.14/Documentation/kbuild/makefiles.txt)を
+読み、Makefilesのソースコードを読み続けることを勧めます。ここでは
 この章で覚えておいてほしい重要な点を強調しておきます。
 
 1. `.c`ファイルはどのようにオブジェクトファイルにコンパイルされるか。
