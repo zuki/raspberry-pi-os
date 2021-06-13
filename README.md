@@ -7,11 +7,11 @@ Raspberry Pi OS、または単に、RPi OSと呼んでいます。RPi OSのソ�
 していますが、OSの機能は非常に限られており、[Raspberry PI 3](https://www.raspberrypi.org/products/raspberry-pi-3-model-b/)に
 しか対応していません。
 
-各レッスンは、まずカーネルの機能がRPi OSでどのように実装されているかを説明し、次に同じ機能がLinuxカーネルでどのように動作しているかを示すにデザイン
+各レッスンは、まずカーネルの機能がRPi OSでどのように実装されているかを説明し、次に同じ機能がLinuxカーネルでどのように動作しているかを示すようにデザイン
 されています。各レッスンには[src](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src)ディレクトリに対応するフォルダがあり、
 そこにはレッスンが終了した時点でのOSのソースコードのスナップショットが
 格納されています。このようにして、新しい概念を徐々に導入することができ、
-読者はRPi OSの進化を追うことができます。このガイドを理解するのに特別な
+読者はRPi OSの進化を追うことができます。このガイドを理解するには特別な
 OS開発のスキルは必要ありません。
 
 プロジェクトの目標や歴史については[プロジェクトの紹介](translations/ja/Introduction.md)を

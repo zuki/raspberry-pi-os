@@ -5,10 +5,10 @@
 と思います。もしそうでなければ、今すぐしてください。
 
 先に進む前に、簡単な命名規約を定めたいと思います。READMEファイルを見るとチュートリアル
-全体が複数のレッスンに分かれていることがわかるでしょう。各レッスンは、私が「チャプタ」と
-呼ぶ個々のファイルで構成されています（今あなたが読んでいるのはレッスン1のチャプタ1.1です）。
-チャプタはさらに見出しを持つ「セクション」に分かれています。この命名規約により、この
-チュートリアルの様々な部分を参照することができます。
+全体が複数のレッスンに分かれていることがわかるでしょう。各レッスンは、私が「章」と
+呼ぶ複数のファイルで構成されています（今あなたが読んでいるのはレッスン1の1.1章です）。
+章はさらに見出しを持つ「節」に分かれています。この命名規約により、このチュートリアルの
+様々な部分を参照することができます。
 
 もうひとつ注目していただきたいのはこのチュートリアルにはソースコードのサンプルが数多く
 含まれていることです。通常、私は完全なコードブロックを提供することで説明を始め、次に、
@@ -17,7 +17,7 @@
 ### プロジェクトの構成
 
 各レッスンのソースコードは同じ構成になっています。このレッスンのソースコードは
-[ここ](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src/lesson01)にあります。
+[`src/lesson01`](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src/lesson01)にあります。
 このフォルダの主な構成要素を簡単に説明しましょう。
 
 1. **Makefile** カーネルのビルドには[make](http://www.math.tau.ac.il/~danha/courses/software1/make-intro.html)ユーティリティーを
@@ -27,16 +27,16 @@
    必要です。Dockerを使うとラップトップにmakeユーティリティーやコンパイラツールチェーンを
    インストールする必要がありません。
 3. **src** すべてのソースコードを含むフォルダです。
-4. **include** すべてのヘッダーファイルはここに置かれます。
+4. **include** すべてのヘッダファイルはここに置かれます。
 
 ### Makefile
 
 では、プロジェクトのMakefileを詳しく見てみましょう。makeユーティリティーの主な目的は
-プログラムのどの部分を再コンパイルする必要があるかを自動的に判断し、それらを再コンパイル
-するためのコマンドを発行することです。makeやMakefileについてよく知らない人は
+再コンパイルする必要があるプログラムを自動的に判断し、それらを再コンパイルするコマンドを
+発行することです。makeやMakefileについてよく知らない方には
 [この記事](http://opensourceforu.com/2012/06/gnu-make-in-detail-for-beginners/) を読むことを
-お勧めします。第1回目のレッスンで使用するMakefileは[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/Makefile)に
-あります。Makefileの全体を以下に示します。
+勧めます。第1回目のレッスンで使用するMakefileは[`src/lesson01/Makefile`](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/Makefile)です。
+Makefileの全体を以下に示します。
 
 ```
 ARMGNU ?= aarch64-linux-gnu
@@ -104,9 +104,9 @@ ASMOPS = -Iinclude
   オプションは標準関数が通常の定義を持っていることを前提としないようにコンパイラに
   指示します。
 * **-Iinclude** ヘッダファイルを`include`フォルダで探すようにします。
-* **-mgeneral-regs-only**. 汎用レジスタのみを使用する。ARMプロセッサは[NEON](https://developer.arm.com/technologies/neon)
-  レジスタも持っていますが、（たとえば、コンテキストスイッチの際にレジスタを保存する
-  必要があるので）複雑性を増すNEONをコンパイラに使ってほしくないからです。
+* **-mgeneral-regs-only**. 汎用レジスタだけを使用する。ARMプロセッサには[NEON](https://developer.arm.com/technologies/neon)
+  レジスタもありますが、（たとえば、コンテキストスイッチの際にレジスタを保存する
+  必要があるなど）複雑性を増すのでコンパイラがNEONを使わないようにしてします。
 
 ```
 BUILD_DIR = build
@@ -152,8 +152,8 @@ OBJ_FILES = $(C_FILES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%_c.o)
 OBJ_FILES += $(ASM_FILES:$(SRC_DIR)/%.S=$(BUILD_DIR)/%_s.o)
 ```
 
-ここでは、Cとアセンブラのソースファイルを連結して作成されるすべてのオブジェクトファイル
-（`OBJ_FILES`）の配列を構築しています（[置換参照](https://www.gnu.org/software/make/manual/html_node/Substitution-Refs.html)を参照）。
+ここでは、Cとアセンブラのソースファイルから作成されるすべてのオブジェクトファイルを連結した
+配列（`OBJ_FILES`）を構築しています（[置換参照](https://www.gnu.org/software/make/manual/html_node/Substitution-Refs.html)を参照）。
 
 
 ```
@@ -162,10 +162,10 @@ DEP_FILES = $(OBJ_FILES:%.o=%.d)
 ```
 
 次の2行は少し注意が必要です。Cとアセンブラのソースファイルのコンパイルターゲットを定義した
-方法を見てみると`-MMD`パラメータを使用していることに気づくでしょう。このパラメータは、
+コードを見てみると`-MMD`パラメータを使用していることに気づくでしょう。このパラメータは、
 生成されるオブジェクトファイルごとに依存関係ファイルを作成するよう`gcc`コンパイラに指示します。
 依存関係ファイルとは、特定のソースファイルに関するすべての依存関係を定義するものです。通常、
-これらの依存関係にはインクルードされるすべてのヘッダーのリストが含まれています。ヘッダが
+これらの依存関係にはインクルードされるすべてのヘッダのリストが含まれています。ヘッダが
 変更された場合にmakeが再コンパイルする内容を正確に知ることができるように、生成されたすべての
 依存関係ファイルをインクルードする必要があります。
 
@@ -187,16 +187,16 @@ $(ARMGNU)-objcopy kernel8.elf -O binary kernel8.img
 データセクションをすべて抜き出して`kernel8.img`イメージに入れる必要があります。
 ファイル名の最後の`8`は64ビットアーキテクチャであるARMv8を示しています。このファイル名は
 ファームウェアにプロセッサを64ビットモードで起動するよう指示します。`config.txt`
-ファイルに`arm_control=0x200`と設定することによりCPUを64ビットモードで起動することも
-できます。RPi OSは以前にこの方法を採用しており、今でも練習問題の解答の中にはこの方法が
-出てくることがあります。しかし、`arm_control`フラグは文書化されておらず、`kernel8.img`
+ファイルに`arm_control=0x200`と設定することによりCPUを64ビットモードで起動させることも
+できます。RPi OSも以前はこの方法を採用しており、今でも練習問題の解答の中にはこの方法が
+出てくることがあります。しかし、`arm_control`フラグは文書化されていないので、`kernel8.img`
 とういう命名規約を使用する方が望ましいです。
 
 ### リンカスクリプト
 
 リンカスクリプトの第一の目的は、入力オブジェクトファイル(`_c.o`と`_s.o`)の各セクションを
 出力ファイル(`.elf`)にどのようにマッピングするかを記述することです。リンカスクリプトに
-関する詳細は[こちら](https://sourceware.org/binutils/docs/ld/Scripts.html#Scripts)を
+関する詳細は[このドキュメント](https://sourceware.org/binutils/docs/ld/Scripts.html#Scripts)を
 ご覧ください。それでは、RPi OSのリンカスクリプトを見てみましょう。
 
 ```
@@ -223,14 +223,14 @@ ELFバイナリのサイズを削減することができます（ELFヘッダ�
 セクション自体は格納されません）。イメージをメモリにロードした後に`.bss`セクションを0に
 初期化する必要があります。セクションの開始アドレスと終了アドレス（`bss_begin`と`bss_end`
 シンボル）を記録しなければならないのはそのためです。また、セクションが8の倍数のアドレス
-から始まるようにアラインする必要があります。セクションがアラインされていないと`str`命令を
-使用して`bss`セクションの先頭に0を格納することが難しくなります。`str`命令は8バイト
+から始まるようにアラインする必要があります。セクションがアラインされていないと`str`命令で
+`bss`セクションの先頭に0を格納することが難しくなります。`str`命令は8バイト
 アラインのアドレスでしか使用できないからです。
 
 ### カーネルを起動する
 
 ようやく[boot.S](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/boot.S)ファイルを
-見る番なりました。このファイルにはカーネルの起動コードが含まれています。
+見ていく番になりました。このファイルにはカーネルの起動コードが含まれています。
 
 ```
 #include "mm.h"
@@ -240,7 +240,7 @@ ELFバイナリのサイズを削減することができます（ELFヘッダ�
 .globl _start
 _start:
     mrs    x0, mpidr_el1
-    and    x0, x0,#0xFF        // プロセッサidをチェック
+    and    x0, x0, #0xFF       // プロセッサidをチェック
     cbz    x0, master          // プライマリCPU以外をハングアップ
     b    proc_hang
 
@@ -270,7 +270,7 @@ master:
 .globl _start
 _start:
     mrs    x0, mpidr_el1
-    and    x0, x0,#0xFF        // プロセッサidをチェック
+    and    x0, x0, #0xFF       // プロセッサidをチェック
     cbz    x0, master          // プライマリCPU以外をハングアップ
     b    proc_hang
 ```
@@ -292,9 +292,9 @@ master:
 ```
 
 ここでは`memzero`を呼び出して`.bss`セクションをゼロクリアします。この関数の定義は後で
-行います。ARMv8アーキテクチャでは、慣習的に、最初の7つの引数はレジスタx0-x6を介して
-呼び出された関数に渡されます。`memzero`関数は引数を2つだけ受け付けます。開始アドレス
-（`bss_begin`）とゼロクリアが必要なセクションのサイズ（`bss_end - bss_begin`）です。
+行います。規約により、ARMv8アーキテクチャでは最初の7つの引数はレジスタx0-x6を使って
+関数に渡します。`memzero`関数は引数を2つだけ受け付けます。開始アドレス（`bss_begin`）と
+ゼロクリアが必要なセクションのサイズ（`bss_end - bss_begin`）です。
 
 ```
     mov    sp, #LOW_MEMORY
@@ -302,9 +302,9 @@ master:
 ```
 
 `.bss`セクションをゼロクリアした後はスタックポインタを初期化し、`kernel_main`関数に
-実行を渡します。Raspberry Piはカーネルをアドレス0にロードします。そのため、初期の
-スタックポインタは十分に高い任意の位置に設定することができ、カーネルイメージが十分に
-大きくなってもスタックが上書きされることはありません。`LOW_MEMORY`は[mm.h](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/include/mm.h) で
+実行を渡します。Raspberry Piはカーネルをアドレス0にロードします。そのため、カーネル
+イメージが大きくなってもスタックが上書きされることがないように、初期のスタックポインタを
+十分に高い任意の位置に設定することができます。`LOW_MEMORY`は[mm.h](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/include/mm.h) で
 定義されており、4MBに相当します。私たちのカーネルのスタックはそれほど大きくならず、
 イメージ自体も小さいので、4MBで十分です。
 
@@ -313,7 +313,7 @@ ARMのアセンブラ文法に詳しくない方のために、今回使用し�
 * [**mrs**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289881374.htm)
   システムレジスタの値を汎用レジスタ(x0–x30)にロードします。
 * [**and**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289863017.htm)
-  論理AND操作を行います。ここでは`mpidr_el1`レジスタから取得したあたりから最後の
+  論理AND操作を行います。ここでは`mpidr_el1`レジスタから取得した値の最後の
   1バイトを取り出すためにこの命令を使用しています。
 * [**cbz**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289867296.htm)
   1つ前に実行した操作の結果と0を比べて、その結果が真の場合、指定したラベルにジャンプ
@@ -321,8 +321,8 @@ ARMのアセンブラ文法に詳しくない方のために、今回使用し�
 * [**b**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289863797.htm)
   指定のラベルに無条件分岐します。
 * [**adr**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289862147.htm)
-  ラベルの相対アドレスをターゲットレジスタにロードします。ここでは`.bss`セクションの
-  開始アドレスと終了アドレスへのポインタを求めています。
+  ラベルの相対アドレスを指定したレジスタにロードします。ここでは`.bss`セクションの
+  開始アドレスと終了アドレスをロードしています。
 * [**sub**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289908389.htm)
   2つのレジスタの値の差を取ります。
 * [**bl**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289865686.htm)
@@ -331,13 +331,12 @@ ARMのアセンブラ文法に詳しくない方のために、今回使用し�
 * [**mov**](http://www.keil.com/support/man/docs/armasm/armasm_dom1361289878994.htm)
   レジスタ間で値を、または定数をレジスタに移動します。
 
-ARMv8-A開発者ガイドが[ここ](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/index.html)にあります。
-これはARM ISAに馴染みのない方には良い資料です。[このページ](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/ch09s01s01.html)ではABIにおけるレジスタ使用規則が具体的に
+[ARMv8-A開発者ガイド](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/index.html)は、ARM ISAに馴染みのない方には良い資料です。[このページ](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/ch09s01s01.html)にはABIにおけるレジスタ使用規約が具体的に
 説明されています。
 
 ### `kernel_main`関数
 
-ブートコードは最終的に`kernel_main`関数に制御を渡すことを見てきました。それを見て
+ブートコードは最終的に`kernel_main`関数に制御を渡すことを見てきました。次はこの関数を見て
 みましょう。
 
 ```
@@ -356,13 +355,13 @@ void kernel_main(void)
 ```
 
 この関数はカーネルの中で最もシンプルな関数の1つです。この関数は`Mini UART`デバイスを使って
-画面に表示し、ユーザーの入力を読み取ります。カーネルは`Hello, world!`と表示した後、ユーザ
+画面表示とユーザ入力の読み取りを行います。カーネルは`Hello, world!`と表示した後、ユーザ
 から文字を読み取って画面に送り返す無限ループに入ります。
 
 ### Raspberry Piデバイス
 
 ここからは、Raspberry Pi固有の内容を掘り下げていきます。その前に[BCM2837 ARMペリフェラルマニュアル](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf)を
-ダウンロードすることをお勧めします。BCM2837は、Raspberry Pi 3 Model BとB+で使用されている
+ダウンロードすることを勧めます。BCM2837は、Raspberry Pi 3 Model BとB+で使用されている
 ボードです。説明の中ではBCM2835とBCM2836にも言及することがあるかもしれません。これらは古い
 Raspberry Piで使用されていたボードの名前です。
 
@@ -373,37 +372,37 @@ BCM2837はシンプルな[SOC (System on a chip)](https://en.wikipedia.org/wiki/
 特定のデバイスの起動や設定を行うには、そのデバイスのレジスタのいずれかに何らかのデータを
 書き込む必要があります。デバイスレジスタは32ビットのメモリ領域に過ぎません。各デバイス
 レジスタの各ビットの意味は「BCM2837 ARMペリフェラルマニュアル」に記載されています。
-（マニュアルでは`0x7E000000`が使用されているにも関わらず）`0x3F000000`をベースアドレスと
-して使用している理由については、マニュアルの「1.2.3 ARM物理アドレス」とその周辺
+（マニュアルには`0x7E000000`が使用されているのに）`0x3F000000`をベースアドレスと
+して使用する理由については、マニュアルの「1.2.3 ARM物理アドレス」とその周辺
 ドキュメントを参照してください。
 
-`kernel_main`関数から`Mini UART`デバイスを使用しようとしていることが推測できるでしょう。
+`kernel_main`関数が`Mini UART`デバイスを使用しようとしていることがわかります。
 UARTとは[Universal asynchronous receiver-transmitter](https://en.wikipedia.org/wiki/Universal_asynchronous_receiver-transmitter)の
-略です。このデバイスは、メモリマップされたレジスタの1つに格納されている値を電圧の高低の
+略です。このデバイスは、メモリマップドレジスタの1つに格納されている値を電圧の高低の
 シーケンスに変換することができます。このシーケンスは`TTLシリアルケーブル`を介して
 コンピュータに渡され、ターミナルエミュレータによって解釈されます。ここではRaspberry Pi
-との通信を容易にするためにMini UARTを使用します。Mini UARTのレジスタの仕様を確認したい
-場合は「BCM2837 ARMペリフェラルマニュアル」の8ページを参照してださい。
+との通信を容易にするためにMini UARTを使用します。Mini UARTのレジスタの仕様を確認する
+には「BCM2837 ARMペリフェラルマニュアル」の8ページを参照してださい。
 
 Raspberry Piには2つのUARTがあります。Mini UARTとPL011 UARTです。このチュートリアルでは
-よりシンプルな1つ目のUARTだけを使用します。しかし、PL011 UARTの扱い方を示すオプションの
-[練習問題](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/docs/lesson01/exercises.md)があります。
-Raspberry PiのUARTについてもっと詳しく知りたい方や2つのUARTの違いを知りたい方は[公式どきゅ](https://www.raspberrypi.org/documentation/configuration/uart.md)を参照してください。
+よりシンプルなMini UARTだけを使用します。しかし、PL011 UARTの扱い方を示すオプションの
+[演習問題](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/docs/lesson01/exercises.md)があります。
+Raspberry PiのUARTについてもっと詳しく知りたい方や2つのUARTの違いを知りたい方は[公式ドキュメント](https://www.raspberrypi.org/documentation/configuration/uart.md)を参照してください。
 
-もう1つ慣れておく必要のあるデバイスはGPIO [汎用入出力（General-purpose input/output）](https://en.wikipedia.org/wiki/General-purpose_input/output)です。GPIOはGPIOピンを制御する役割を
+もう1つ慣れておく必要のあるデバイスがGPIO [汎用入出力（General-purpose input/output）](https://en.wikipedia.org/wiki/General-purpose_input/output)です。GPIOはGPIOピンを制御する役割を
 担っています。下の画像を見ればすぐにわかるはずです。
 
-![Raspberry Pi GPIO pins](../../images/gpio-pins.jpg)
+![Raspberry Pi GPIO pins](../../../images/gpio-pins.jpg)
 
-GPIOは各GPIOピンの動作を構成するために使用できます。たとえば、Mini UARTを使えるように
+GPIOは各GPIOピンの動作の構成用に使用できます。たとえば、Mini UARTを使えるように
 するには、ピン14と15をアクティブにして、このデバイスを使えるように設定する必要があります。
 下の画像はGPIOピンの番号がどのように割り当てられているのかを示しています。
 
-![Raspberry Pi GPIO pin numbers](../../images/gpio-numbers.png)
+![Raspberry Pi GPIO pin numbers](../../../images/gpio-numbers.png)
 
 ### Mini UARTの初期化
 
-では、mini UARTがどのように初期化されるかを見てみましょう。このコードは [mini_uart.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/mini_uart.c)で
+では、mini UARTをどのように初期化するのかを見てみましょう。このコードは [mini_uart.c](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson01/src/mini_uart.c)で
 定義されています。
 
 ```
@@ -448,7 +447,7 @@ void uart_init ( void )
 接続するかを設定します。下の図は利用可能なすべてのGPIO代替機能のリストです（図は
 「BCM2837 ARMペリフェラルマニュアル」の102ページから引用しました）。
 
-![Raspberry Pi GPIO alternative functions](../../images/alt.png?raw=true)
+![Raspberry Pi GPIO alternative functions](../../../images/alt.png?raw=true)
 
 ここでは、ピン14と15にTXD1とRXD1の代替機能が用意されていることがわかります。これは
 ピン14と15に代替機能番号5を選択すれば、それぞれMini UART送信データピンおよびMini UART
@@ -456,9 +455,9 @@ void uart_init ( void )
 代替機能の制御に使用されます。これらのレジスタのすべてのビットの意味は次の表に示されて
 います（「BCM2837 ARMペリフェラルマニュアル」の92ページ）。
 
-![Raspberry Pi GPIO function selector](../../images/gpfsel1.png?raw=true)
+![Raspberry Pi GPIO function selector](../../../images/gpfsel1.png?raw=true)
 
-これで、Mini UARTデバイスを使用できるようにGPIOピン14と15を設定するために使用される
+これで、Mini UARTデバイスを使用できるようにGPIOピン14と15を設定するために使用している
 以下のコードを理解するために必要なことがすべてわかりました。
 
 ```
@@ -475,37 +474,37 @@ void uart_init ( void )
 #### GPIOプルアップ/プルダウン
 
 Raspberry PiのGPIOピンを扱っているとプルアップ/プルダウンといった用語をよく目に
-するようになります。これらの概念については[この記事](https://grantwinney.com/using-pullup-and-pulldown-resistors-on-the-raspberry-pi/)で詳しく説明されています。
+するようになります。これらの概念については[この記事](https://grantwinney.com/using-pullup-and-pulldown-resistors-on-the-raspberry-pi/)で詳しく説明されていますが、
 記事全体を読むのが面倒な方のためにプルアップ/プルダウンの概念を簡単に説明します。
 
-あるピンを入力として使用していても、このピンに何も接続していないと、このピンの値が
-1なのか0なのかを識別することはできません。実際、デバイスはランダムな値を報告します。
-この問題を解決するのがプルアップ/プルダウン機構です。ピンをプルアップ状態に設定して、
-何も接続しなければ、常に`1`を報告します（プルダウン状態では、値は常に0です）。今回の
+あるピンを入力として使用していても、このピンに何も接続されていないと、このピンの値が
+1なのか0なのかを識別できません。実際、デバイスはランダムな値を報告します。
+この問題を解決するのがプルアップ/プルダウン機構です。ピンをプルアップ状態に設定すると、
+何も接続されていなければ、常に`1`を報告します（プルダウン状態では、値は常に0です）。今回の
 ケースでは、14ピンと15ピンは共に常に接続されているため、プルアップ状態もプルダウン状態も
-必要ありません。ピンの状態は再起動後も保持されるのでピンを使用する前には必ずその状態を
+必要ありません。ピンの状態は再起動後も保持されるので、ピンを使用する前には必ずその状態を
 初期化する必要があります。設定可能な状態は、プルアップ、プルダウン、どちらでもない
 （現在のプルアップまたはプルダウンの状態を解除する）の3つで、ここでは3つ目の状態が
 必要です。
 
 ピンの状態を切り替えることはそれほど簡単なことではありません。電気回路上のスイッチを
 物理的に切り替える必要があるからです。このプロセスには`GPPUD`レジスタと`GPPUDCLK`
-レジスタが関与しており、B「BCM2837 ARMペリフェラルマニュアル」の101ページに記載されて
+レジスタが関与しており、「BCM2837 ARMペリフェラルマニュアル」の101ページに記載されて
 います。その記述を以下にコピーしました。
 
-```
-GPIOプルアップ/プルダウンクロックレジスタはGPIOピンの内部プルダウン動作を制御します。
-GPIOのプルアップ/プルダウンを変更するには、これらのレジスタとGPPUDレジスタを連携させて
-使用する必要があります。次のような操作手順が必要です。
-1. 必要な制御信号を設定（プルアップ、プルダウン、または現在のプルアップ/ダウンを解除）
-   するためにGPPUDに書き込む。
-2. 150サイクル待つ。これは制御信号に必要なセットアップタイムを与える。
-3. 制御信号を変更したいGPIOパッドに入力するためにGPPUDCLK0/1に書き込む。
-   注意: クロックを受信したパッドのみが変更され、その他のパッドは以前の状態を維持する。
-4. 150サイクル待つ 。これは制御信号に必要なホールドタイムを与える。
-5. 制御信号を除去するためにGPPUDに書き込む。
-6. クロックを除去するためにGPPUDCLK0/1に書き込む。
-```
+
+> GPIOプルアップ/プルダウンクロックレジスタはGPIOピンの内部プルダウン動作を制御します。
+> GPIOのプルアップ/プルダウンを変更するには、これらのレジスタとGPPUDレジスタを連携させて
+> 使用する必要があります。次のような操作手順が必要です。
+> 1. 必要な制御信号を設定（プルアップ、プルダウン、または現在のプルアップ/ダウンを解除）
+>    するためにGPPUDに書き込む。
+> 2. 150サイクル待つ。これは制御信号に必要なセットアップタイムを与えます。
+> 3. 制御信号を変更したいGPIOパッドに入力するためにGPPUDCLK0/1に書き込む。
+>    注意: クロックを受信したパッドのみが変更され、その他のパッドは以前の状態を維持します。
+> 4. 150サイクル待つ 。これは制御信号に必要なホールドタイムを与えます。
+> 5. 制御信号を除去するためにGPPUDに書き込む。
+> 6. クロックを除去するためにGPPUDCLK0/1に書き込む。
+
 
 この手順では、1つのピンからプルアップとプルダウン双方の状態を解除する方法を説明しています。
 これがピン14と15について次のコードで行っていることです。
@@ -529,18 +528,18 @@ Mini UARTの初期化です。
     put32(AUX_MU_IER_REG,0);                // 送受信割り込みを無効にする
     put32(AUX_MU_LCR_REG,3);                // 8ビットモードに設定する
     put32(AUX_MU_MCR_REG,0);                // RTSラインを常にHighに設定する
-    put32(AUX_MU_BAUD_REG,270);             // 通信速度を115200に設定する
+    put32(AUX_MU_BAUD_REG,270);             // ボーレートを115200に設定する
 
     put32(AUX_MU_CNTL_REG,3);               // 最後に、送受信機を有効にする
 ```
 
-コード片を一行ずつ見ていきましょう。
+コードを一行ずつ見ていきましょう。
 
 ```
     put32(AUX_ENABLES,1);                   // mini uartを有効にする（これはそのレジスタへのアクセスも有効にする）
 ```
 
-この行は、Mini UARTを有効にします。これは最初に行う必要があります。これは他のすべての
+この行はMini UARTを有効にしています。これは最初に行う必要があります。他のすべての
 Mini UARTレジスタへのアクセスも有効にするからです。
 
 ```
@@ -556,8 +555,8 @@ Mini UARTレジスタへのアクセスも有効にするからです。
     put32(AUX_MU_IER_REG,0);                // 送受信割り込みを無効にする
 ```
 
-新しいデータが利用可能になるたびにプロセッサに割り込みを生成するようにMini UARTを
-設定することができます。割り込みについてはレッスン3で扱う予定なので、現時点では、
+新しいデータが利用可能になるたびにプロセッサに割り込みをかけるようにMini UARTを
+構成することができます。割り込みについてはレッスン3で扱う予定なので、現時点では、
 この機能を無効にしておきます。
 
 ```
@@ -576,7 +575,7 @@ RTSラインはフロー制御で使用されるものなので必要ありま�
 設定します。
 
 ```
-    put32(AUX_MU_BAUD_REG,270);             // 通信速度を115200に設定する
+    put32(AUX_MU_BAUD_REG,270);             // ボーレートを115200に設定する
 ```
 
 ボーレートとは、通信チャネルで情報を転送する速度のことです。"115200ボー"は
@@ -659,8 +658,8 @@ kernel_old=1
 disable_commandline_tags=1
 ```
 
-* `kernel_old=1`はカーネルイメージをアドレス0にロードするよう指定します。
-* `disable_commandline_tags=1`は、ブートイメージにコマンドライン引数も渡さない
+* `kernel_old=1`はカーネルイメージをアドレス0にロードするよう指示します。
+* `disable_commandline_tags=1`は、ブートイメージにコマンドライン引数を渡さない
   ようにGPUに指示します。
 
 ### カーネルのテスト
@@ -671,10 +670,10 @@ disable_commandline_tags=1
 1. [src/lesson01](https://github.com/s-matyukevich/raspberry-pi-os/tree/master/src/lesson01)で
    `./build.sh`または`./build.bat`を実行してカーネルをビルドします。
 2. 生成された`kernel8.img`ファイルをRaspberry Piフラッシュカードの`boot`パーティションに
-   コピーし、`kernel7.img`とSDカードに存在する可能性のある他の`kernel*.img`ファイルを
+   コピーし、SDカードにそれ以外の`kernel*.img`（`kernel7.img`など）ファイルが存在する場合は
    削除します。ブートパーティションにあるその他のファイルはすべてそのままにしておいて
-   ください（詳細はissueの[43](https://github.com/s-matyukevich/raspberry-pi-os/issues/43) と
-   [158](https://github.com/s-matyukevich/raspberry-pi-os/issues/158)を参照）。
+   ください（詳細は[issue 43](https://github.com/s-matyukevich/raspberry-pi-os/issues/43) と
+   [issue 158](https://github.com/s-matyukevich/raspberry-pi-os/issues/158)を参照）。
 3. 前節で説明したように`config.txt`ファイルを修正します。
 4. [前提条件](../Prerequisites.md)で説明したようにUSB-TTLシリアルケーブルを接続します。
 5. Raspberry Piの電源を入れます。
@@ -688,14 +687,14 @@ disable_commandline_tags=1
     * ブートパーティションをFAT32でフォーマットします。
     > カードはRaspbianのインストールに必要な方法でフォーマットする必要があります。詳細は
     [公式ドキュメント](https://www.raspberrypi.org/documentation/installation/noobs.md) の
-    「SDカードをFATでフォーマットする方法」のセクションをご覧ください。
+    「SDカードをFATでフォーマットする方法」をご覧ください。
 2. 以下のファイルをカードにコピーします。
     * [bootcode.bin](https://github.com/raspberrypi/firmware/blob/master/boot/bootcode.bin)
     これはGPUブートローダです。GPUを起動してGPUファームウェアをロードするためのGPUコードが
     含まれています。
     * [start.elf](https://github.com/raspberrypi/firmware/blob/master/boot/start.elf)
     これはGPUファームウェアです。`config.txt`を読み込んで、GPUが`kernel8.img`からARM固有の
-    ユーザーコードをロードして実行できるようにします。
+    ユーザコードをロードして実行できるようにします。
 3. `kernel8.img`と`config.txt`をコピーします。
 4. USB-TTLシリアルケーブルを接続します。
 5. Raspberry Piの電源を入れます。
