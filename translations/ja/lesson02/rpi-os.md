@@ -235,7 +235,7 @@ Zフラグが1にセットされているかをテストすることでこれを
 状態を準備します。[ここ](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/src/lesson02/include/arm/sysregs.h#L35)では`SPSR_VALUE`を用意し、
 以下のフィールドを初期化しています。
 
-* `#define SPSR_MASK_ALL        (7 << 6)` ELをEL1に変更した後、すべての種類の割り込みをマスクします（または無効にします。同じ意味です）。
+* `#define SPSR_MASK_ALL        (7 << 6)` ELをEL1に変更した後、すべての種類の割り込みをマスクします（つまり、無効にします。同じ意味です）。
 * `#define SPSR_EL1h        (5 << 0)` EL1では、専用のスタックポインタを使用するか、EL0のスタックポインタのいずれかを使用することができます。`EL1h`モードは、EL1専用のスタックポインタを使用することを意味します。
 
 > **訳注**: QEMUではEL2で実行されるため、同じ設定を`spsr_el2`に対して行います。
