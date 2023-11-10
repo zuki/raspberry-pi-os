@@ -152,8 +152,8 @@ ARM v8アーキテクチャをサポートしていないからです。今度�
 
 ##### 前ページ
 
-[Main Page](../../README.md)
+[目次](../../README.md)
 
 ##### 次ページ
 
-[Contributing to the Raspberry PI OS](../ja/Contributions.md)
+[Raspberry PI OSへの貢献](../ja/Contributions.md)
