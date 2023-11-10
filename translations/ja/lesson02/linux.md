@@ -71,7 +71,7 @@ RAMにおける物理アドレスが格納されます。`x1 - x3`は将来の�
 
 ### el2_setup
 
-a[arm64boot protocol](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt#L159)によると
+[arm64boot protocol](https://github.com/torvalds/linux/blob/v4.14/Documentation/arm64/booting.txt#L159)によると
 カーネルはEL1とEL2のいずれかで起動することができます。後者の場合、カーネルは
 仮想化拡張機能にアクセスでき、ホストOSとして動作することができます。幸運にも
 EL2で起動できた場合は、[el2_setup](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/kernel/head.S#L386)
@@ -97,7 +97,8 @@ EL1とEL2で専用のスタックポインタを使用します。EL0のスタ�
 
 ```
     mrs    x0, sctlr_el1
-CPU_BE(    orr    x0, x0, #(3 << 24)    )    // EL1のEEビットとE0EビットをセットCPU_LE(    bic    x0, x0, #(3 << 24)    )    // EL1のEEビットとE0Eビットをクリア
+CPU_BE(    orr    x0, x0, #(3 << 24)    )    // EL1のEEビットとE0Eビットをセット
+CPU_LE(    bic    x0, x0, #(3 << 24)    )    // EL1のEEビットとE0Eビットをクリア
     msr    sctlr_el1, x0
     mov    w0, #BOOT_CPU_MODE_EL1            // このCPUはEL1でブート
     isb
@@ -107,7 +108,8 @@ CPU_BE(    orr    x0, x0, #(3 << 24)    )    // EL1のEEビットとE0Eビット
 EL1で実行することになった場合は、CPUが「ビッグエンディアン」と
 「リトルエンディアン」のいずれかで動作するように[CPU_BIG_ENDIAN](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/Kconfig#L612)
 構成設定値を設定して`sctlr_el1`レジスタを更新します。そして、`el2_setup`関数を
-終了して、[BOOT_CPU_MODE_EL1](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/virt.h#L55)定数を返します[ARM64の関数呼び出し規約](http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf)に従い、返り値は`x0`レジスタ(ここでは`w0`。`w0`レジスタは、`x0`の最初の32ビットと
+終了して、[BOOT_CPU_MODE_EL1](https://github.com/torvalds/linux/blob/v4.14/arch/arm64/include/asm/virt.h#L55)定数を返します。
+[ARM64の関数呼び出し規約](http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf)に従い、返り値は`x0`レジスタ(ここでは`w0`。`w0`レジスタは、`x0`の最初の32ビットと
 考えることができます)に入れる必要があります。
 
 ```
