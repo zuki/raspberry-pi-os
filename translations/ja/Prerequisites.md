@@ -1,30 +1,45 @@
-## Prerequisites
+## 前提条件
 
 ### 1. [Raspberry Pi 3 Model B](https://www.raspberrypi.org/products/raspberry-pi-3-model-b/)
 
-Older versions of Raspberry Pi are not going to work with this tutorial because all lessons are designed to use a 64-bit processor that supports ARMv8 architecture, and such processor is only available in the Raspberry Pi 3. Newer versions, including [Raspberry Pi 3 Model B+](https://www.raspberrypi.org/products/raspberry-pi-3-model-b-plus/) should work fine, though I haven't tested it yet.
+これより古いバージョンのRaspberry Piは、このチュートリアルでは動作しません。なぜなら、
+すべてのレッスンはARMv8アーキテクチャがサポートする64ビットプロセッサを使用するように
+設計されており、そのようなプロセッサはRaspberry Pi 3にしか搭載されていないからです。
+[Raspberry Pi 3 Model B+](https://www.raspberrypi.org/products/raspberry-pi-3-model-b-plus/)など、これより新しいバージョンであれば問題なく動作する
+はずですが、まだテストしていません。
 
-### 2. [USB to TTL serial cable](https://www.amazon.com/s/ref=nb_sb_noss_2?url=search-alias%3Daps&field-keywords=usb+to+ttl+serial+cable&rh=i%3Aaps%2Ck%3Ausb+to+ttl+serial+cable)
+### 2. [USB-TTLシリアルケーブル](https://www.amazon.com/s/ref=nb_sb_noss_2?url=search-alias%3Daps&field-keywords=usb+to+ttl+serial+cable&rh=i%3Aaps%2Ck%3Ausb+to+ttl+serial+cable)
 
-After you get a serial cable, you need to test your connection. If you never did this before I recommend you to follow [this guide](https://cdn-learn.adafruit.com/downloads/pdf/adafruits-raspberry-pi-lesson-5-using-a-console-cable.pdf) It describes the process of connecting your Raspberry PI via a serial cable in great details.
+シリアルケーブルを入手したら、接続をテストする必要があります。まだテストをしていない
+方はテストをする前に[このガイド](https://cdn-learn.adafruit.com/downloads/pdf/adafruits-raspberry-pi-lesson-5-using-a-console-cable.pdf)を読むことを勧めます。
+このガイドにはシリアルケーブルを使ってRaspberry PIを接続する方法が詳しく説明されて
+います。
 
-The guide also describes how to power your Raspberry Pi using a serial cable. RPi OS works fine with such kind of setup, however, in this case you need to run your terminal emulator right after you plug in the cable. Check [this](https://github.com/s-matyukevich/raspberry-pi-os/issues/2)
- issue for details..
+また、このガイドには、シリアルケーブルを使ってRaspberry Piに電源を供給する方法も
+説明されています。RPi OSはこのような設定でも問題なく動作しますが、この場合、ケーブルを
+接続した直後にターミナルエミュレータを起動する必要があります。詳しくは[このレッスン](https://github.com/s-matyukevich/raspberry-pi-os/issues/2)をご覧ください。
 
-### 3. [SD card](https://www.raspberrypi.org/documentation/installation/sd-cards.md) with installed [Raspbian OS](https://www.raspberrypi.org/downloads/raspbian/)
+### 3. [Raspbian OS](https://www.raspberrypi.org/downloads/raspbian/)がインストールされた
+[SDカード](https://www.raspberrypi.org/documentation/installation/sd-cards.md)
 
-We need Raspbian to test USB to TTL cable connectivity initially. Another reason is that after installation it leaves the SD card formatted in the right way.
+最初にUSB-TTLケーブルの接続をテストするためにはRaspbianが必要です。もう一つの理由は、
+インストールするとSDカードが正しい方法でフォーマットされるからです。
 
 ### 4. Docker
 
-Strictly speaking, Docker is not a required dependency. It is just convenient to use Docker to build source code of the lessons, especially for Mac and Windows users. Each lesson has `build.sh` script (or `build.bat` for windows users) This script uses Docker to build source code of the lesson. Instructions how to install docker for your platform can be found on the [official docker website](https://docs.docker.com/engine/installation/)
+厳密に言えば、Dockerは必ずしも必要ではありません。ただ、Dockerを使うと、レッスンの
+ソースコードのビルドが簡単になります。特に、MacやWindowsユーザには便利です。
+各レッスンにはbuild.shスクリプト（Windowsユーザにはbuild.bat）があります。この
+スクリプトはDockerを使ってレッスンのソースコードをビルドします。使用しているプラット
+フォームにdockerをインストールする方法は[dockerの公式サイト](https://docs.docker.com/engine/installation/)にあります。
 
-If for some reasons you want to avoid using Docker, you can install the [make utility](http://www.math.tau.ac.il/~danha/courses/software1/make-intro.html) as well as  `aarch64-linux-gnu` toolchain. If you are using Ubuntu you just need to install `gcc-aarch64-linux-gnu` and `build-essential` packages.
+何らかの理由でDockerの使用を避けたい場合は、`aarch64-linux-gnu`ツールチェインと
+[makeユーティリティ](http://www.math.tau.ac.il/~danha/courses/software1/make-intro.html)をインストールしてください。Ubuntuを使用している場合は、`gcc-arch64-linux-gnu`と`build-essential`パッケージをインストールするだけです。
 
-##### Previous Page
+##### 前ページ
 
-[Contribution guide](../ja/Contributions.md)
+[貢献ガイド](../ja/Contributions.md)
 
-##### Next Page
+##### 次ページ
 
-1.1 [Kernel Initialization: Introducing RPi OS, or bare metal "Hello, world!"](../ja/lesson01/rpi-os.md)
+1.1 [カーネルの初期化: RPi OSの導入、ベアメタルで"Hello, World!"](lesson01/rpi-os.md)
