@@ -39,8 +39,8 @@ OS開発のスキルは必要ありません。
 ## Table of Contents
 
 * **[プロジェクト紹介](translations/ja/Introduction.md)**
-* **[Contribution](translations/ja/Contributions.md)**
-* **[Prerequisites](translations/ja/Prerequisites.md)**
+* **[貢献ガイド](translations/ja/Contributions.md)**
+* **[前提条件](translations/ja/Prerequisites.md)**
 * **Lesson 1: カーネルの初期化**
   * 1.1 [RPi OSの導入、ベアメタルで"Hello, World!"](translations/ja/lesson01/rpi-os.md)
   * Linux
