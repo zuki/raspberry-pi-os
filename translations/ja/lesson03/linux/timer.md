@@ -265,7 +265,7 @@ irqアクションを構成したら、タイマ割り込みのirqアクショ�
 フレームワークに入ってきた割り込みがどのように処理されるのかさらに深く掘り下げて
 いきます。
 
-### クロックいえbンとフレームワークに置いて割り込みはどのように処理されるか
+### クロックイベントフレームワークに置いて割り込みはどのように処理されるか
 
 前節では、タイマ割り込みを処理する実際の作業はクロックイベントフレームワークに
 委託されていることを確認しました。これは[`bcm2835_timer.c#L74`](https://github.com/torvalds/linux/blob/v4.14/drivers/clocksource/bcm2835_timer.c#L74)の
@@ -298,7 +298,7 @@ tickを生成するデバイスとして使用され、カーネルの他の部�
 
 コールチェーンの最後の関数を見てみると、Linuxはブロードキャストが有効か否かに
 応じて異なるハンドラを使用していることがわかります。tickブロードキャストは
-アイドル状態のCPUを目覚めさせるために使われます。詳しくは[これ]](https://lwn.net/Articles/574962/)を読んでください。しかし、ここではそれを無視して、代わりにもっと
+アイドル状態のCPUを目覚めさせるために使われます。詳しくは[これ](https://lwn.net/Articles/574962/)を読んでください。しかし、ここではそれを無視して、代わりにもっと
 一般的なtickハンドラに集中することにします。
 
 一般的なケースでは、[tick_handle_periodic](https://github.com/torvalds/linux/blob/v4.14/kernel/time/tick-common.c#L99)と
@@ -332,8 +332,8 @@ static void tick_periodic(int cpu)
 
 1. 次のtickイベントがスケジューリングするための`tick_next_period`を計算します。
 2.  'jiffies'の設定を行う[do_timer](https://github.com/torvalds/linux/blob/v4.14/kernel/time/timekeeping.c#L2200)を呼び出します。`jiffies`は最新のシステム再起動
-からのtick数です。`jiffies`は`sched_clock`関数と同じように、ナノ秒単位の精度を
-必要としない場合に使用できます。
+からのtick数です。`jiffies`はナノ秒単位の精度を必要としない場合に、`sched_clock`
+関数と同じように使用できます。
 3. [update_process_times](https://github.com/torvalds/linux/blob/v4.14/kernel/time/timer.c#L1583)を呼び出します。これは現在実行中のプロセスに定期的に行う必要のある
 すべての作業を行う機会を与える場所です。この作業には、たとえば、ローカルプロセス
 タイマの実行や、最も重要な作業としてはtickイベントのスケジューラへの通知などが
