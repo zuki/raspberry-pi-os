@@ -1,32 +1,37 @@
-## Contributing to the Raspberry PI OS
+## Raspberry PI OSへの貢献
 
-The general workflow is the following:
+一般的なワークフローは次の通りです。
 
-1. Find an [issue](https://github.com/s-matyukevich/raspberry-pi-os/issues) you want to start working on or create a new one.
-1. In comments claim that you want to take over the issue. The first person who does this will be assigned to the issue.
-1. [Fork the repository](https://help.github.com/articles/fork-a-repo/).
-1. Make all necessary changes.
-1. [Send a pull request](https://help.github.com/articles/about-pull-requests/).
-1. After a review, your changes will be merged.
+1. 作業を開始したい[問題点](https://github.com/s-matyukevich/raspberry-pi-os/issues)を
+   見つけるか、新しい課題を作成する。
+2. コメントで、その課題を引き継ぎたいことを宣言します。最初に宣言した人がその課題に
+   割り当てられます。
+3. [リポジトリをフォークします](https://help.github.com/articles/fork-a-repo/)。
+4. 必要な変更をすべて行います。
+5. [プルリクエストを送信します](https://help.github.com/articles/about-pull-requests/)。
+6. レビュー後に、あなたの変更がマージされます。
 
-The following types of contributions are particularly useful for the project.
+このプロジェクトでは、次のようなタイプの貢献が特に有効です。
 
-1. Validating the source code and text of the lessons, fixing bugs and errors.
-1. Help in making lessons content more accurate and easier to understand.
-1. Working on the source code and content for new lessons.
-1. Sharing source code of completed exercises.
-1. Suggesting new exercises.
-1. Providing feedback, requesting new features and content.
-1. Anything else that can help the project.
+1. レッスンのソースコードやテキストを検証し、バグやエラーを修正する。
+2. レッスンの内容をより正確に、かつ、よりわかりやすくする。
+3. 新しいレッスンのためのソースコードやコンテンツを作成する。
+4. 完成した演習問題のソースコードを共有する。
+5. 新しい演習問題を提案する。
+6. フィードバックをしたり、新機能や新コンテンツをリクエストする。
+7. その他、プロジェクトに貢献できることなら何でも。
 
-### Contributing completed exercises
+### 完成した演習問題のソースコードを提供する
 
-If you successfully completed any of the exercises you can share your source code. The code should be placed in the following folder `/exercises/lessonXX/<exercise number>/<your github username>/` Such folder structure allows to accept pull requests for the same exercise from different people.
+いずれかの演習問題を完成させた場合、そのソースコードを共有することができます。
+ソースコードは `/exercises/lessonXX/<exercise number>/<your github username>/` と
+いうフォルダに置いてください。このようなフォルダ構成にすることで、同じ演習問題に
+対するプルリクエストを多数の人から受け付けることができます。
 
-##### Previous Page
+##### 前ページ
 
-[Introduction](../ja/Introduction.md)
+[プロジェクト紹介](Introduction.md)
 
-##### Next Page
+##### 次ページ
 
-[Prerequisites](../ja/Prerequisites.md)
+[前提条件](Prerequisites.md)
